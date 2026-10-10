@@ -1,0 +1,2914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LIMONS — Autonomous Drone Defense & Intelligence Command</title>
+  <meta name="description" content="AI-Based Autonomous Drone Detection & Early Warning System — Dual Camera Live Monitoring, Plotly Analytics & Tactical Report Generation"/>
+  <link rel="stylesheet" href="/static/style.css"/>
+  <!-- Plotly.js for interactive tactical charts -->
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+</head>
+<body>
+
+  <!-- ═══════════ TOP NAVIGATION BAR ═══════════ -->
+  <nav class="navbar">
+    <div class="navbar__inner">
+      <div class="brand">
+        <!-- SVG matching the uploaded Limons brand emblem -->
+        <svg class="brand__logo-svg" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Top Left Leaf with Dots -->
+          <path d="M47 48C47 25 32 10 15 15C10 32 25 47 47 48Z" stroke="#F3A5AD" stroke-width="4" stroke-linejoin="round"/>
+          <circle cx="28" cy="28" r="2" fill="#F3A5AD"/>
+          <circle cx="35" cy="24" r="1.8" fill="#F3A5AD"/>
+          <circle cx="24" cy="35" r="1.8" fill="#F3A5AD"/>
+          <circle cx="34" cy="34" r="2.2" fill="#F3A5AD"/>
+
+          <!-- Top Right Leaf -->
+          <path d="M53 48C53 25 68 10 85 15C90 32 75 47 53 48Z" stroke="#F3A5AD" stroke-width="4" stroke-linejoin="round"/>
+          <path d="M57 44L77 24" stroke="#F3A5AD" stroke-width="2.5" stroke-linecap="round"/>
+
+          <!-- Bottom Left Leaf (Filled Rose with Burgundy Stippling) -->
+          <path d="M47 52C47 75 32 90 15 85C10 68 25 53 47 52Z" fill="#F3A5AD" stroke="#F3A5AD" stroke-width="3" stroke-linejoin="round"/>
+          <circle cx="28" cy="72" r="2.2" fill="#680202"/>
+          <circle cx="35" cy="76" r="1.8" fill="#680202"/>
+          <circle cx="24" cy="65" r="1.8" fill="#680202"/>
+          <circle cx="33" cy="66" r="2" fill="#680202"/>
+          <circle cx="40" cy="60" r="1.6" fill="#680202"/>
+          <circle cx="22" cy="78" r="1.6" fill="#680202"/>
+
+          <!-- Bottom Right Leaf -->
+          <path d="M53 52C53 75 68 90 85 85C90 68 75 53 53 52Z" stroke="#F3A5AD" stroke-width="4" stroke-linejoin="round"/>
+          <path d="M57 56L77 76" stroke="#F3A5AD" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
+
+        <div class="brand__text">
+          <div class="brand__name">LIMONS <span>DRONE DEFENSE</span></div>
+          <div class="brand__tagline">Autonomous Aerial Early Warning & Intelligence</div>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <div class="nav-tabs" role="tablist">
+        <button class="tab-btn active" data-tab="tab-live" role="tab">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>
+          Dual Cameras & Live Feeds
+        </button>
+        <button class="tab-btn" data-tab="tab-analytics" role="tab">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18 9l-5 5-4-4-3 3"/></svg>
+          Plotly Analytics & Trends
+        </button>
+        <button class="tab-btn" data-tab="tab-reports" role="tab">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          Audit Reports (Weekly / Monthly / Yearly)
+        </button>
+        <button class="tab-btn" data-tab="tab-gallery" role="tab">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+          Evidence &amp; Snapshot Intel
+        </button>
+        <button class="tab-btn" data-tab="tab-camera-setup" role="tab">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Camera IP &amp; GPS Setup
+        </button>
+        <button class="tab-btn" data-tab="tab-rf-siren" role="tab">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.93 19.07A10 10 0 0 1 19.07 4.93M7.76 16.24A6 6 0 0 1 16.24 7.76M12 12h.01"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83"/></svg>
+          📡 RF Comset &amp; Siren Setup
+        </button>
+      </div>
+
+      <!-- Live Status & Clock -->
+      <div class="navbar__controls">
+        <div class="status-badge status-badge--live">
+          <span class="status-dot" id="stream-dot"></span>
+          <span id="conn-text">SECURE LINK LIVE</span>
+        </div>
+        <div class="clock-display" id="nav-clock">00:00:00 UTC+5</div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ═══════════ INCURSION ALERT BANNER ═══════════ -->
+  <div class="incursion-banner" id="incursion-banner" role="alert">
+    <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+      <span class="pulse-alarm-icon">🚨</span>
+      <span id="banner-text">TACTICAL ALERT: AERIAL TARGET DETECTED IN PERIMETER</span>
+      <span class="siren-live-tag" id="banner-siren-tag">🔊 SIREN: <span id="banner-siren-timer">30s</span></span>
+      <span class="rf-live-tag" id="banner-rf-tag">📡 RF: 5 UNITS ALERTED</span>
+    </div>
+    <div style="display:flex; gap:0.5rem; align-items:center;">
+      <button class="ctrl-btn btn-danger-pill" onclick="stopSirenAlarm()">🔇 MUTE SIREN</button>
+      <button class="ctrl-btn" style="background:rgba(0,0,0,0.3); border-color:#fff;" onclick="dismissAlert()">DISMISS</button>
+    </div>
+  </div>
+
+  <!-- ═══════════ DASHBOARD CONTAINER ═══════════ -->
+  <main class="dashboard-container">
+
+    <!-- ── High-Level KPI Summary Row ── -->
+    <section class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-card__header">
+          <span class="kpi-card__title">Total Detections</span>
+          <div class="kpi-card__icon">🎯</div>
+        </div>
+        <div class="kpi-card__value" id="kpi-total">1,420</div>
+        <div class="kpi-card__sub">
+          <span class="kpi-card__trend">+12.4%</span> vs previous cycle
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-card--danger">
+        <div class="kpi-card__header">
+          <span class="kpi-card__title">Today Incursions</span>
+          <div class="kpi-card__icon">⚡</div>
+        </div>
+        <div class="kpi-card__value" id="kpi-today">14</div>
+        <div class="kpi-card__sub">
+          <span class="kpi-card__trend kpi-card__trend--up">ACTIVE ALERT</span> 3 in last 2 hrs
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-card__header">
+          <span class="kpi-card__title">Active Cameras</span>
+          <div class="kpi-card__icon">📹</div>
+        </div>
+        <div class="kpi-card__value" id="kpi-cameras">2 / 2</div>
+        <div class="kpi-card__sub">
+          Cam 01 (Optical) &amp; Cam 02 (Thermal)
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-card__header">
+          <span class="kpi-card__title">AI Pipeline</span>
+          <div class="kpi-card__icon">🧠</div>
+        </div>
+        <div class="kpi-card__value" style="font-size:1.45rem;">YOLO11m</div>
+        <div class="kpi-card__sub">
+          SAHI Slicing + DeepSORT Re-ID
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-card__header">
+          <span class="kpi-card__title">Neutralization Rate</span>
+          <div class="kpi-card__icon">🛡️</div>
+        </div>
+        <div class="kpi-card__value" id="kpi-success">98.9%</div>
+        <div class="kpi-card__sub">
+          Avg response time: <span class="kpi-card__trend">112ms</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═════════════════════════════════════════════════════════ -->
+    <!-- TAB 1: DUAL CAMERAS & LIVE TACTICAL MONITORING            -->
+    <!-- ═════════════════════════════════════════════════════════ -->
+    <div class="tab-content active" id="tab-live">
+      
+      <!-- Dual Camera Feeds -->
+      <section class="camera-section">
+        <div class="section-header">
+          <h2 class="section-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+            Multi-Sensor Dual Camera Feeds (Real-Time 2-Cam Surveillance)
+          </h2>
+          <div class="ctrl-btn-group">
+            <button class="ctrl-btn active" id="btn-toggle-hud" onclick="toggleHUD()">
+              <span>🎯</span> HUD Overlay: ON
+            </button>
+            <button class="ctrl-btn" onclick="triggerTestAlert()">
+              <span>🔔</span> Test Alert Broadcast
+            </button>
+          </div>
+        </div>
+
+        <div class="cameras-grid">
+          <!-- Camera 01: North Perimeter -->
+          <div class="camera-feed-card" id="cam-card-1">
+            <div class="camera-feed-card__header">
+              <div class="camera-info">
+                <span class="camera-badge">CAM 01</span>
+                <span class="camera-name">North Perimeter — Optical HD 1080p</span>
+              </div>
+              <div class="camera-meta">
+                <span class="meta-pill">25.0 FPS</span>
+                <span class="meta-pill">FOV 110°</span>
+                <span class="status-dot"></span>
+              </div>
+            </div>
+
+            <div class="camera-viewport">
+              <img class="camera-stream-img" src="/api/video_feed/primary" alt="Camera 01 Live Stream" loading="eager"/>
+              
+              <!-- Tactical HUD Overlay -->
+              <div class="tactical-hud" id="hud-cam1">
+                <div class="hud-corner hud-corner--tl"></div>
+                <div class="hud-corner hud-corner--tr"></div>
+                <div class="hud-corner hud-corner--bl"></div>
+                <div class="hud-corner hud-corner--br"></div>
+                <div class="hud-reticle"></div>
+                <div class="hud-badge-rec">
+                  <span class="rec-pulse"></span>
+                  LIVE REC
+                </div>
+                <div class="hud-telemetry">
+                  AZIMUTH: 045.2° | ELEV: 18.4° | RNG: 320m
+                </div>
+              </div>
+            </div>
+
+            <div class="camera-controls-bar">
+              <div class="ctrl-btn-group">
+                <button class="ctrl-btn" onclick="captureSnapshot('cam1')">📷 Snap</button>
+                <button class="ctrl-btn active">Optical HD</button>
+                <button class="ctrl-btn" onclick="toggleNightFilter('cam1')">🌙 Low-Light</button>
+              </div>
+              <div class="camera-meta">
+                <span>LATENCY: 12ms</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Camera 02: East Sector Thermal -->
+          <div class="camera-feed-card" id="cam-card-2">
+            <div class="camera-feed-card__header">
+              <div class="camera-info">
+                <span class="camera-badge" style="background:#9A1E23;">CAM 02</span>
+                <span class="camera-name">East Sector — Thermal / FLIR Long-Wave</span>
+              </div>
+              <div class="camera-meta">
+                <span class="meta-pill">25.0 FPS</span>
+                <span class="meta-pill">IR FLIR</span>
+                <span class="status-dot"></span>
+              </div>
+            </div>
+
+            <div class="camera-viewport">
+              <img class="camera-stream-img" src="/api/video_feed/secondary" alt="Camera 02 Live Stream" loading="eager"/>
+
+              <!-- Tactical HUD Overlay -->
+              <div class="tactical-hud" id="hud-cam2">
+                <div class="hud-corner hud-corner--tl"></div>
+                <div class="hud-corner hud-corner--tr"></div>
+                <div class="hud-corner hud-corner--bl"></div>
+                <div class="hud-corner hud-corner--br"></div>
+                <div class="hud-reticle"></div>
+                <div class="hud-badge-rec">
+                  <span class="rec-pulse"></span>
+                  THERMAL REC
+                </div>
+                <div class="hud-telemetry">
+                  AZIMUTH: 128.5° | FLIR TEMP: 32.4°C | TRK: CONFIRMED
+                </div>
+              </div>
+            </div>
+
+            <div class="camera-controls-bar">
+              <div class="ctrl-btn-group">
+                <button class="ctrl-btn" onclick="captureSnapshot('cam2')">📷 Snap</button>
+                <button class="ctrl-btn active">Thermal FLIR</button>
+                <button class="ctrl-btn" onclick="toggleNightFilter('cam2')">🔥 Ironbow</button>
+              </div>
+              <div class="camera-meta">
+                <span>LATENCY: 14ms</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════ REAL-TIME TELEMETRY & TACTICAL AIRSPACE RADAR ═══════════ -->
+      <section class="telemetry-radar-section">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/><path d="M12 12l7-7"/></svg>
+              Live Aerial Target Telemetry &amp; Tactical PPI Airspace Radar
+            </h2>
+            <p style="font-size:0.75rem; color:var(--color-muted); margin-top:0.2rem;">
+              Direct Real-Time Kinematics: True Compass Bearing, Slant Distance, Altitude, Ground Range &amp; WGS-84 Geolocation.
+            </p>
+          </div>
+          <div class="ctrl-btn-group">
+            <button class="ctrl-btn" id="btn-radar-sweep-toggle" onclick="toggleRadarSweep()">
+              <span>🔄</span> Sweep: ON
+            </button>
+            <button class="ctrl-btn" onclick="simulateHostileDroneFlight()">
+              <span>🚨</span> Simulate Incursion (Demo)
+            </button>
+            <button class="ctrl-btn" onclick="clearLiveTelemetryAndRadar()">
+              <span>🗑️</span> Clear
+            </button>
+          </div>
+        </div>
+
+        <div class="telemetry-radar-grid">
+          <!-- Left: Real-Time Telemetry Table -->
+          <div class="telemetry-card">
+            <div class="telemetry-card__header">
+              <div class="telemetry-card__title">
+                <span>🎯</span> Active Target Telemetry Feed
+              </div>
+              <div class="target-count-badge" id="telemetry-target-count-badge">
+                <span class="status-dot"></span> <span id="telemetry-count-text">0 TARGETS LOCKED</span>
+              </div>
+            </div>
+
+            <div class="telemetry-table-wrapper">
+              <table class="telemetry-table" id="telemetry-table">
+                <thead>
+                  <tr>
+                    <th>Target ID</th>
+                    <th>Sensor / Cam</th>
+                    <th>Bearing (Deg / Dir)</th>
+                    <th>Distance (3D)</th>
+                    <th>GND Range</th>
+                    <th>Altitude (Z)</th>
+                    <th>WGS-84 Drone GPS</th>
+                    <th>Confidence / Lock</th>
+                    <th>Last Detect</th>
+                  </tr>
+                </thead>
+                <tbody id="telemetry-table-body">
+                  <tr id="telemetry-empty-row">
+                    <td colspan="9" class="telemetry-empty-row">
+                      📡 Airspace clear. Dual camera optical/thermal sensors scanning for targets...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.6rem; font-size:0.7rem; color:var(--color-dim);">
+              <span>* Pinhole model + Geodesic Vincenty Direct Projection (WGS-84 Ellipsoid)</span>
+              <span>Coordinates refreshed on every confirmed detection</span>
+            </div>
+          </div>
+
+          <!-- Right: Tactical PPI Radar Scope -->
+          <div class="radar-card">
+            <div class="radar-card__header">
+              <div class="radar-card__title">
+                <span>🛰️</span> Tactical Airspace Radar (PPI Scope)
+              </div>
+              <div style="display:flex; gap:0.4rem; align-items:center;">
+                <span style="font-size:0.68rem; color:var(--color-muted);">Range:</span>
+                <button class="ctrl-btn active" style="padding:0.15rem 0.45rem; font-size:0.68rem;" onclick="setRadarRange(100, this)">100m</button>
+                <button class="ctrl-btn" style="padding:0.15rem 0.45rem; font-size:0.68rem;" onclick="setRadarRange(200, this)">200m</button>
+                <button class="ctrl-btn" style="padding:0.15rem 0.45rem; font-size:0.68rem;" onclick="setRadarRange(500, this)">500m</button>
+              </div>
+            </div>
+
+            <div class="radar-scope-wrapper">
+              <div class="radar-scope" id="radar-scope-screen">
+                <!-- Outer Cardinals -->
+                <span class="radar-cardinal radar-cardinal--n">000° N</span>
+                <span class="radar-cardinal radar-cardinal--e">090° E</span>
+                <span class="radar-cardinal radar-cardinal--s">180° S</span>
+                <span class="radar-cardinal radar-cardinal--w">270° W</span>
+
+                <!-- Concentric Range Rings -->
+                <div class="radar-ring radar-ring--1"><span class="radar-ring-label" id="radar-lbl-r1">25m</span></div>
+                <div class="radar-ring radar-ring--2"><span class="radar-ring-label" id="radar-lbl-r2">50m</span></div>
+                <div class="radar-ring radar-ring--3"><span class="radar-ring-label" id="radar-lbl-r3">75m</span></div>
+                <div class="radar-ring radar-ring--4"><span class="radar-ring-label" id="radar-lbl-r4">100m</span></div>
+
+                <!-- Crosshairs -->
+                <div class="radar-axis-h"></div>
+                <div class="radar-axis-v"></div>
+
+                <!-- Camera Sector Arc Overlay (80 deg FOV facing 90 deg East) -->
+                <svg class="radar-cam-wedge" viewBox="0 0 100 100">
+                  <path d="M50 50 L95 20 A 50 50 0 0 1 95 80 Z" fill="rgba(243, 165, 173, 0.15)" stroke="rgba(243, 165, 173, 0.4)" stroke-dasharray="2,2"/>
+                </svg>
+
+                <!-- Rotating Sweep Line -->
+                <div class="radar-sweep" id="radar-sweep-beam"></div>
+
+                <!-- Center Base Station Pinpoint -->
+                <div class="radar-center-base" id="radar-center-base" title="Base Camera: 33.6844°N, 73.0479°E | Facing: 090° (E)"></div>
+
+                <!-- Dynamic Drone Target Blips are appended here -->
+                <div id="radar-blips-container"></div>
+              </div>
+            </div>
+
+            <div class="radar-footer-telemetry" id="radar-footer-telemetry">
+              <span>📍 BASE: 33.6844°N, 73.0479°E</span>
+              <span id="radar-summary-target">AIRSPACE CLEAR</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tactical Lower Grid: Real-Time Event Log & Health -->
+      <div class="tactical-lower-grid">
+        <!-- Event Log -->
+        <section class="panel">
+          <div class="panel__header">
+            <h3 class="panel__title">
+              <span>📋</span> Real-Time Aerial Incursion Log
+            </h3>
+            <button class="panel__action" onclick="clearEventLog()">Clear View</button>
+          </div>
+          <div class="event-log-list" id="event-log-container">
+            <!-- Dynamic events populated via SSE or API -->
+            <div class="event-item">
+              <span class="event-item__time">21:28:14</span>
+              <span class="event-badge event-badge--detect">DETECT</span>
+              <span class="event-item__text">Cam 01: Commercial Quadcopter detected at bearing 046.2° (Confidence: 96.4%)</span>
+              <button class="ctrl-btn" style="padding:0.2rem 0.5rem;" onclick="showToast('Snapshot archived in logs/snapshots')">🖼️</button>
+            </div>
+            <div class="event-item">
+              <span class="event-item__time">21:24:02</span>
+              <span class="event-badge event-badge--alert">ALERT</span>
+              <span class="event-item__text">Auto-Alert Triggered: Siren pulse 15s + GSM broadcast to tactical security team</span>
+            </div>
+            <div class="event-item">
+              <span class="event-item__time">21:18:50</span>
+              <span class="event-badge event-badge--detect">DETECT</span>
+              <span class="event-item__text">Cam 02 (Thermal): High-speed micro-FPV drone tracked across East Sector</span>
+            </div>
+            <div class="event-item">
+              <span class="event-item__time">21:05:12</span>
+              <span class="event-badge event-badge--detect">DETECT</span>
+              <span class="event-item__text">Cam 01: DeepSORT Track #04 locked for 18 consecutive frames</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Alert Channels & Health -->
+        <section class="panel">
+          <div class="panel__header">
+            <h3 class="panel__title">
+              <span>🔔</span> Alert Channels &amp; Edge Health
+            </h3>
+            <span class="status-badge">ARMED</span>
+          </div>
+
+          <div class="channels-grid">
+            <div class="channel-card">
+              <div>
+                <div class="channel-title">Siren Relay</div>
+                <div style="font-size:0.68rem; color:var(--color-muted);">GPIO Pin 17</div>
+              </div>
+              <span class="channel-status">READY</span>
+            </div>
+            <div class="channel-card">
+              <div>
+                <div class="channel-title">GSM SMS Alert</div>
+                <div style="font-size:0.68rem; color:var(--color-muted);">/dev/ttyUSB0</div>
+              </div>
+              <span class="channel-status">READY</span>
+            </div>
+            <div class="channel-card">
+              <div>
+                <div class="channel-title">RF Comset</div>
+                <div style="font-size:0.68rem; color:var(--color-muted);">433 MHz Armed</div>
+              </div>
+              <span class="channel-status">READY</span>
+            </div>
+            <div class="channel-card">
+              <div>
+                <div class="channel-title">Auto Landline</div>
+                <div style="font-size:0.68rem; color:var(--color-muted);">Dialer Standby</div>
+              </div>
+              <span class="channel-status" style="color:var(--color-dim);">STANDBY</span>
+            </div>
+          </div>
+
+          <!-- Hardware Metrics -->
+          <div class="health-bars" style="margin-top:1.4rem;">
+            <div class="health-item">
+              <div class="health-item__header">
+                <span class="health-item__label">Edge CPU (Jetson / PC)</span>
+                <span class="health-item__val" id="val-cpu">34%</span>
+              </div>
+              <div class="progress-track"><div class="progress-fill" id="fill-cpu" style="width:34%;"></div></div>
+            </div>
+
+            <div class="health-item">
+              <div class="health-item__header">
+                <span class="health-item__label">GPU TensorRT VRAM</span>
+                <span class="health-item__val" id="val-ram">48%</span>
+              </div>
+              <div class="progress-track"><div class="progress-fill" id="fill-ram" style="width:48%;"></div></div>
+            </div>
+
+            <div class="health-item">
+              <div class="health-item__header">
+                <span class="health-item__label">Core Temperature</span>
+                <span class="health-item__val" id="val-temp">46.5°C</span>
+              </div>
+              <div class="progress-track"><div class="progress-fill" id="fill-temp" style="width:46%; background:linear-gradient(90deg, #2ec4b6, #ff9f1c);"></div></div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+    </div>
+
+    <!-- ═════════════════════════════════════════════════════════ -->
+    <!-- TAB 2: PLOTLY CHARTS & STATISTICAL INTELLIGENCE           -->
+    <!-- ═════════════════════════════════════════════════════════ -->
+    <div class="tab-content" id="tab-analytics">
+      
+      <!-- Analytics Controls Bar -->
+      <div class="analytics-controls-bar">
+        <div class="filter-group">
+          <span class="filter-label">Analytics Scope:</span>
+          <div class="pill-group">
+            <button class="pill-btn active" onclick="switchChartScope('weekly', this)">Weekly (7 Days)</button>
+            <button class="pill-btn" onclick="switchChartScope('monthly', this)">Monthly (30 Days)</button>
+            <button class="pill-btn" onclick="switchChartScope('yearly', this)">Yearly (12 Months)</button>
+          </div>
+        </div>
+
+        <div class="filter-group">
+          <span class="filter-label">Sensor Source:</span>
+          <div class="pill-group">
+            <button class="pill-btn active" onclick="filterCameraCharts('all', this)">Both Cameras</button>
+            <button class="pill-btn" onclick="filterCameraCharts('primary', this)">Cam 01 (Optical)</button>
+            <button class="pill-btn" onclick="filterCameraCharts('secondary', this)">Cam 02 (Thermal)</button>
+          </div>
+        </div>
+
+        <button class="btn-export" onclick="refreshAllPlotlyCharts()">
+          <span>🔄</span> Refresh Charts
+        </button>
+      </div>
+
+      <!-- Plotly Charts Grid -->
+      <div class="charts-grid">
+        
+        <!-- Chart 1: Primary Timeline Plot (Weekly/Monthly/Yearly Incursions) -->
+        <div class="chart-card chart-card--full">
+          <div class="chart-card__header">
+            <div>
+              <h3 class="chart-card__title" id="main-chart-title">Weekly Aerial Incursion Trajectory (Camera 1 vs Camera 2)</h3>
+              <p class="chart-card__subtitle">Interactive Plotly multi-sensor line &amp; area breakdown with confidence intervals</p>
+            </div>
+            <span class="meta-pill" style="color:var(--color-accent);">PLOTLY.JS INTERACTIVE</span>
+          </div>
+          <div class="chart-container" id="plotly-main-timeline"></div>
+        </div>
+
+        <!-- Chart 2: Threat Classification & Composition -->
+        <div class="chart-card">
+          <div class="chart-card__header">
+            <div>
+              <h3 class="chart-card__title">Drone Threat Categorization</h3>
+              <p class="chart-card__subtitle">Quadcopter, Fixed-Wing, Micro-FPV, and Stealth UAV distribution</p>
+            </div>
+          </div>
+          <div class="chart-container" id="plotly-threat-composition"></div>
+        </div>
+
+        <!-- Chart 3: 360° Directional Bearing Radar (Azimuth Polar Plot) -->
+        <div class="chart-card">
+          <div class="chart-card__header">
+            <div>
+              <h3 class="chart-card__title">360° Threat Bearing Radar (Azimuth Angle)</h3>
+              <p class="chart-card__subtitle">Polar directional distribution of detected drone flight paths</p>
+            </div>
+          </div>
+          <div class="chart-container" id="plotly-bearing-polar"></div>
+        </div>
+
+        <!-- Chart 4: 24-Hour Peak Incursion Windows -->
+        <div class="chart-card">
+          <div class="chart-card__header">
+            <div>
+              <h3 class="chart-card__title">24-Hour Risk Distribution &amp; Dusk Vulnerability</h3>
+              <p class="chart-card__subtitle">Hourly threat density identifying high-risk patrol windows</p>
+            </div>
+          </div>
+          <div class="chart-container" id="plotly-hourly-heatmap"></div>
+        </div>
+
+        <!-- Chart 5: System Operational Capability Spider Radar -->
+        <div class="chart-card">
+          <div class="chart-card__header">
+            <div>
+              <h3 class="chart-card__title">Autonomous Defense Capability Assessment</h3>
+              <p class="chart-card__subtitle">Sensitivity, tracking stability, weather tolerance &amp; response latency</p>
+            </div>
+          </div>
+          <div class="chart-container" id="plotly-capability-radar"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═════════════════════════════════════════════════════════ -->
+    <!-- TAB 3: AUDIT REPORTS GENERATOR (Weekly, Monthly, Yearly)   -->
+    <!-- ═════════════════════════════════════════════════════════ -->
+    <div class="tab-content" id="tab-reports">
+      <div class="report-workspace">
+        
+        <!-- Controls Column -->
+        <div class="report-controls-panel">
+          <div>
+            <h3 style="font-size:1.05rem; font-weight:700; color:var(--color-light); margin-bottom:0.25rem;">Report Generator</h3>
+            <p style="font-size:0.75rem; color:var(--color-muted);">Generate comprehensive aerial defense intelligence reports with audited KPIs &amp; charts.</p>
+          </div>
+
+          <div class="control-field">
+            <label for="report-period-select">Reporting Period</label>
+            <select class="control-select" id="report-period-select">
+              <option value="weekly" selected>Weekly Report (Last 7 Days)</option>
+              <option value="monthly">Monthly Audit (October 2026)</option>
+              <option value="yearly">Yearly Intelligence Report (2026 Annual)</option>
+            </select>
+          </div>
+
+          <div class="control-field">
+            <label for="report-camera-select">Sensor Coverage</label>
+            <select class="control-select" id="report-camera-select">
+              <option value="all" selected>All Sensors (Cam 01 Optical + Cam 02 Thermal)</option>
+              <option value="primary">Primary Sensor Only (Cam 01 North)</option>
+              <option value="secondary">Secondary Sensor Only (Cam 02 East Thermal)</option>
+            </select>
+          </div>
+
+          <div class="control-field">
+            <label for="report-officer-name">Intelligence Officer / Operator</label>
+            <input class="control-input" type="text" id="report-officer-name" value="Security Operator (Station 01)" />
+          </div>
+
+          <button class="btn-generate-report" onclick="generateReport()">
+            <span>⚡</span> Generate Official Report
+          </button>
+
+          <div class="report-export-actions">
+            <button class="btn-export" onclick="window.print()">
+              <span>🖨️</span> Print / Save PDF Report
+            </button>
+            <button class="btn-export" onclick="exportReportCSV()">
+              <span>📥</span> Export Audit Data (CSV)
+            </button>
+            <button class="btn-export" onclick="exportReportJSON()">
+              <span>💾</span> Export Raw Intelligence (JSON)
+            </button>
+          </div>
+        </div>
+
+        <!-- Generated Report Canvas -->
+        <div class="report-sheet-wrapper" id="printable-report-area">
+          <div class="report-sheet-header">
+            <div class="report-sheet-brand">
+              <svg class="brand__logo-svg" viewBox="0 0 100 100" fill="none" style="width:52px;height:52px;">
+                <path d="M47 48C47 25 32 10 15 15C10 32 25 47 47 48Z" stroke="#F3A5AD" stroke-width="4" stroke-linejoin="round"/>
+                <circle cx="28" cy="28" r="2" fill="#F3A5AD"/>
+                <circle cx="34" cy="34" r="2.2" fill="#F3A5AD"/>
+                <path d="M53 48C53 25 68 10 85 15C90 32 75 47 53 48Z" stroke="#F3A5AD" stroke-width="4" stroke-linejoin="round"/>
+                <path d="M57 44L77 24" stroke="#F3A5AD" stroke-width="2.5" stroke-linecap="round"/>
+                <path d="M47 52C47 75 32 90 15 85C10 68 25 53 47 52Z" fill="#F3A5AD" stroke="#F3A5AD" stroke-width="3" stroke-linejoin="round"/>
+                <circle cx="28" cy="72" r="2.2" fill="#680202"/>
+                <circle cx="33" cy="66" r="2" fill="#680202"/>
+                <path d="M53 52C53 75 68 90 85 85C90 68 75 53 53 52Z" stroke="#F3A5AD" stroke-width="4" stroke-linejoin="round"/>
+                <path d="M57 56L77 76" stroke="#F3A5AD" stroke-width="2.5" stroke-linecap="round"/>
+              </svg>
+              <div class="report-title-block">
+                <h1 id="rep-title">Weekly Tactical Drone Activity Audit</h1>
+                <p id="rep-date-range">Coverage Window: 27 Sep 2026 – 03 Oct 2026 &bull; Scope: Dual Camera Multi-Sensor</p>
+              </div>
+            </div>
+            <div class="report-stamp">
+              CLASSIFIED<br/>DEFENSE AUDIT
+            </div>
+          </div>
+
+          <!-- Report KPIs -->
+          <div class="report-kpi-grid">
+            <div class="report-kpi-box">
+              <label>Total Incursions</label>
+              <span id="rep-kpi-total">48</span>
+            </div>
+            <div class="report-kpi-box">
+              <label>High Threat Count</label>
+              <span id="rep-kpi-high" style="color:#ff6b81;">12</span>
+            </div>
+            <div class="report-kpi-box">
+              <label>Neutralized Rate</label>
+              <span id="rep-kpi-rate" style="color:var(--status-ok);">98.9%</span>
+            </div>
+            <div class="report-kpi-box">
+              <label>Mean Intercept Range</label>
+              <span id="rep-kpi-range">290m</span>
+            </div>
+          </div>
+
+          <!-- Report Incident Breakdown Table -->
+          <div class="report-table-wrapper">
+            <table class="report-table" id="report-incident-table">
+              <thead>
+                <tr>
+                  <th>Period Segment</th>
+                  <th>Detections</th>
+                  <th>Threat Tier</th>
+                  <th>Defense Status</th>
+                  <th>Avg AI Confidence</th>
+                </tr>
+              </thead>
+              <tbody id="report-table-body">
+                <!-- Dynamically rendered rows -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Recommendations -->
+          <div class="report-recommendations">
+            <h3>Tactical Recommendations &amp; Countermeasures:</h3>
+            <ul class="rec-list" id="rep-recommendations-list">
+              <li>Maintain continuous multi-threaded inference with SAHI 512x512 tile slicing.</li>
+              <li>Realign East Sector perimeter sensor due to concentrated dusk incursion bearing.</li>
+              <li>Keep automated GSM broadcast enabled for all confirmed tracks with &gt;5 frames.</li>
+              <li>Perform routine optical cleaning on North Perimeter camera lens every 7 days.</li>
+            </ul>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═════════════════════════════════════════════════════════ -->
+    <!-- TAB 4: EVIDENCE VIDEO VAULT & SNAPSHOT INTELLIGENCE       -->
+    <!-- ═════════════════════════════════════════════════════════ -->
+    <div class="tab-content" id="tab-gallery">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">
+            <span>📹</span> Forensic Evidence Video Vault &amp; Snapshot Intel
+          </h2>
+          <p style="font-size:0.75rem; color:var(--color-muted); margin-top:0.2rem;">
+            Automatically generates and locally archives MP4 video evidence clips &amp; high-res snapshots whenever a hostile drone is detected.
+          </p>
+        </div>
+        <div style="display:flex; gap:0.5rem;">
+          <button class="btn-export" onclick="loadEvidenceVault()">
+            <span>🔄</span> Refresh Evidence Vault
+          </button>
+        </div>
+      </div>
+
+      <!-- Video Vault Section -->
+      <div style="margin-bottom:2.5rem;">
+        <div class="evidence-section-title">
+          <span>🎬</span> Automatically Recorded MP4 Evidence Clips (Saved to logs/evidence_videos/)
+        </div>
+        <div class="evidence-video-grid" id="evidence-video-container">
+          <!-- Dynamically populated evidence video cards -->
+        </div>
+      </div>
+
+      <!-- Snapshot Stills Section -->
+      <div>
+        <div class="evidence-section-title">
+          <span>🖼️</span> Forensic High-Resolution Target Still Snapshots (Saved to logs/snapshots/)
+        </div>
+        <div class="gallery-grid" id="snapshot-gallery-container">
+          <!-- Snapshots dynamically injected -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ═════════════════════════════════════════════════════════ -->
+    <!-- TAB 5: CAMERA INTEGRATION & IP/GPS CONFIG (camera_int)    -->
+    <!-- ═════════════════════════════════════════════════════════ -->
+    <div class="tab-content" id="tab-camera-setup">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">
+            <span>🎥</span> Camera Integration, IP Stream &amp; GPS Setup
+          </h2>
+          <p style="font-size:0.75rem; color:var(--color-muted); margin-top:0.2rem;">
+            Configure IP cameras, RTSP streams, base city, and latitude/longitude coordinates. Designed for non-technical operators.
+          </p>
+        </div>
+      </div>
+
+      <!-- Camera Selector Tabs -->
+      <div class="camera-select-tabs">
+        <button class="cam-tab-btn active" id="btn-select-cam1" onclick="switchCamSetup('primary', this)">
+          <span>📹</span> Camera 01 (North Perimeter Optical)
+        </button>
+        <button class="cam-tab-btn" id="btn-select-cam2" onclick="switchCamSetup('secondary', this)">
+          <span>🔥</span> Camera 02 (East Sector Thermal)
+        </button>
+      </div>
+
+      <!-- Workspace Grid -->
+      <div class="camera-setup-workspace">
+        
+        <!-- Left: Configuration Form -->
+        <div class="setup-card">
+          <div class="setup-card__header">
+            <h3 class="setup-card__title">
+              <span>⚙️</span> Camera Parameters (<span id="setup-current-cam-label">Camera 01</span>)
+            </h3>
+            <span class="meta-pill" id="setup-sensor-pill" style="color:var(--color-accent);">OPTICAL HD</span>
+          </div>
+
+          <!-- Connection Status Summary -->
+          <div class="setup-status-box">
+            <div>
+              <div style="font-size:0.7rem; color:var(--color-muted); text-transform:uppercase; font-weight:600;">Stream Status</div>
+              <div style="font-size:0.88rem; font-weight:700; color:var(--color-light); margin-top:0.15rem;" id="setup-status-text">
+                RTSP Stream Ready (Local / IP)
+              </div>
+            </div>
+            <div id="setup-conn-badge">
+              <span class="status-indicator-tag status-indicator-tag--sim">
+                <span class="status-dot"></span> SIMULATION / STANDBY
+              </span>
+            </div>
+          </div>
+
+          <!-- Form Fields Grid -->
+          <div class="form-grid-2col">
+            <div class="control-field form-group-full">
+              <label for="cam-name">Camera Name / Label</label>
+              <input class="control-input" type="text" id="cam-name" placeholder="e.g. North Perimeter — Optical HD" />
+              <div class="form-hint">A descriptive label shown on dashboard feeds and audit reports.</div>
+            </div>
+
+            <div class="control-field">
+              <label for="cam-ip">Camera IP Address</label>
+              <input class="control-input" type="text" id="cam-ip" placeholder="192.168.1.101" />
+              <div class="form-hint">Local or WAN IP of your CCTV / IP camera.</div>
+            </div>
+
+            <div class="control-field">
+              <label for="cam-port">RTSP / HTTP Port</label>
+              <input class="control-input" type="number" id="cam-port" placeholder="554" value="554" />
+              <div class="form-hint">Standard RTSP port is 554 (HTTP is 80 or 8080).</div>
+            </div>
+
+            <div class="control-field">
+              <label for="cam-mode">Connection Protocol</label>
+              <select class="control-select" id="cam-mode">
+                <option value="ip_rtsp" selected>RTSP Stream (Standard CCTV / IP Security Camera)</option>
+                <option value="ip_http">HTTP Stream (IP Webcam / Mobile App Stream)</option>
+                <option value="usb">USB Camera Index (Device 0 or 1)</option>
+                <option value="custom">Custom Direct Stream URL</option>
+              </select>
+            </div>
+
+            <div class="control-field">
+              <label for="cam-path">RTSP Stream Path</label>
+              <input class="control-input" type="text" id="cam-path" placeholder="/stream1 or /h264Preview_01_main" />
+              <div class="form-hint">Stream path provided by your camera manufacturer (e.g. /stream1).</div>
+            </div>
+
+            <div class="control-field">
+              <label for="cam-user">Username (Optional)</label>
+              <input class="control-input" type="text" id="cam-user" placeholder="admin" />
+            </div>
+
+            <div class="control-field">
+              <label for="cam-pass">Password (Optional)</label>
+              <input class="control-input" type="password" id="cam-pass" placeholder="Camera password" />
+            </div>
+
+            <div class="control-field form-group-full">
+              <label for="cam-city">City / Base Station Location</label>
+              <input class="control-input" type="text" id="cam-city" placeholder="Islamabad, Rawalpindi, Lahore, etc." />
+              <div class="form-hint">City where this camera sensor is deployed.</div>
+            </div>
+
+            <div class="control-field">
+              <label for="cam-lat">GPS Latitude (°N)</label>
+              <input class="control-input" type="number" step="0.000001" id="cam-lat" placeholder="33.6844" />
+            </div>
+
+            <div class="control-field">
+              <label for="cam-lon">GPS Longitude (°E)</label>
+              <input class="control-input" type="number" step="0.000001" id="cam-lon" placeholder="73.0479" />
+            </div>
+
+            <div class="control-field form-group-full">
+              <button class="btn-export" style="width:100%;" onclick="autoDetectLocation()">
+                <span>📍</span> Auto-Detect My Current GPS Location
+              </button>
+            </div>
+
+            <div class="control-field">
+              <label for="cam-azimuth">Compass Heading / Azimuth (°)</label>
+              <input class="control-input" type="number" step="0.5" id="cam-azimuth" placeholder="45.0" />
+              <div class="form-hint">Direction camera faces (0° North, 90° East, 180° South).</div>
+            </div>
+
+            <div class="control-field">
+              <label for="cam-sensor-type">Sensor Modality</label>
+              <select class="control-select" id="cam-sensor-type">
+                <option value="optical" selected>Optical Visible HD 1080p</option>
+                <option value="thermal">Thermal / FLIR Long-Wave Infrared</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Connection Test Alert Banner -->
+          <div class="probe-result-alert" id="probe-alert">
+            <span id="probe-alert-icon">🔍</span>
+            <span id="probe-alert-msg">Testing connection...</span>
+          </div>
+
+          <!-- Buttons -->
+          <div style="display:flex; gap:0.8rem; margin-top:1.4rem;">
+            <button class="btn-export" style="flex:1;" onclick="testCameraProbe()">
+              <span>🔍</span> Test IP Connection
+            </button>
+            <button class="btn-generate-report" style="flex:1.4;" onclick="saveCameraConfiguration()">
+              <span>💾</span> Save &amp; Apply Camera Config
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: Live Feed Verification & Geo Radar Preview -->
+        <div class="setup-card" style="display:flex; flex-direction:column;">
+          <div class="setup-card__header">
+            <h3 class="setup-card__title">
+              <span>📺</span> Live Stream Verification
+            </h3>
+            <span class="meta-pill" id="setup-preview-fps">25.0 FPS</span>
+          </div>
+
+          <!-- Live Feed Viewport -->
+          <div class="camera-viewport" style="border-radius:var(--radius-md); border:1px solid var(--color-border);">
+            <img class="camera-stream-img" id="setup-preview-img" src="/api/video_feed/primary" alt="Camera Live Preview" />
+            <div class="tactical-hud">
+              <div class="hud-corner hud-corner--tl"></div>
+              <div class="hud-corner hud-corner--tr"></div>
+              <div class="hud-corner hud-corner--bl"></div>
+              <div class="hud-corner hud-corner--br"></div>
+              <div class="hud-badge-rec">VERIFICATION STREAM</div>
+            </div>
+          </div>
+
+          <!-- Live Telemetry Box -->
+          <div class="geo-telemetry-badge">
+            <h4><span>📍</span> Active Geo-Spatial Telemetry</h4>
+            <div class="geo-readout-row">
+              <span>Base Station City:</span>
+              <strong id="geo-city-val">Islamabad</strong>
+            </div>
+            <div class="geo-readout-row">
+              <span>GPS Coordinates:</span>
+              <strong id="geo-coords-val">33.6844° N, 73.0479° E</strong>
+            </div>
+            <div class="geo-readout-row">
+              <span>Facing Azimuth:</span>
+              <strong id="geo-azimuth-val">045.0° (North-East)</strong>
+            </div>
+            <div class="geo-readout-row">
+              <span>RTSP Target URL:</span>
+              <strong id="geo-rtsp-val" style="word-break:break-all; font-size:0.7rem;">rtsp://192.168.1.101:554/stream1</strong>
+            </div>
+          </div>
+
+          <!-- Drone Triangulation Explanation -->
+          <div class="report-recommendations" style="margin-top:1rem; padding:0.85rem 1rem;">
+            <h3 style="font-size:0.82rem; margin-bottom:0.25rem;">Autonomous Geo-Triangulation</h3>
+            <p style="font-size:0.73rem; color:var(--color-muted);">
+              When an aerial target is detected, the system calculates the drone's exact target coordinates using the camera's GPS position (<strong id="geo-calc-sample">33.6844 N, 73.0479 E</strong>) combined with bearing azimuth and laser/optical range estimation.
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═════════════════════════════════════════════════════════ -->
+    <!-- TAB 6: RF COMSET (5-UNIT BROADCAST) & 30s SIREN SETUP    -->
+    <!-- ═════════════════════════════════════════════════════════ -->
+    <div class="tab-content" id="tab-rf-siren">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">
+            <span>📡</span> Tactical RF Comset (5-Unit Radio Broadcast) &amp; 30-Second Siren Setup
+          </h2>
+          <p style="font-size:0.75rem; color:var(--color-muted); margin-top:0.2rem;">
+            Configure radio transmission parameters (Port, Baud, Frequency), broadcast to 5 tactical units simultaneously with pre-recorded message, and manage the 30-second audible siren relay.
+          </p>
+        </div>
+        <div style="display:flex; gap:0.5rem;">
+          <button class="btn-export" onclick="loadRFComsetStatus()">
+            <span>🔄</span> Refresh Radio Status
+          </button>
+        </div>
+      </div>
+
+      <!-- Main Controls Row -->
+      <div class="camera-setup-workspace" style="margin-bottom:1.5rem;">
+        
+        <!-- Left: RF Radio Comset Parameters -->
+        <div class="setup-card">
+          <div class="setup-card__header">
+            <h3 class="setup-card__title">
+              <span>📻</span> RF Comset Transmitter Parameters
+            </h3>
+            <span class="meta-pill" style="color:var(--status-ok);">UHF 433 MHz</span>
+          </div>
+
+          <div class="setup-status-box">
+            <div>
+              <div style="font-size:0.7rem; color:var(--color-muted); text-transform:uppercase; font-weight:600;">Hardware Transceiver Status</div>
+              <div style="font-size:0.88rem; font-weight:700; color:var(--color-light); margin-top:0.15rem;" id="rf-status-text">
+                RF Radio Modem Linked (COM3 @ 9600 Baud)
+              </div>
+            </div>
+            <div id="rf-conn-badge">
+              <span class="status-indicator-tag status-indicator-tag--online">
+                <span class="status-dot"></span> 5 NODES ARMED
+              </span>
+            </div>
+          </div>
+
+          <div class="form-grid-2col">
+            <div class="control-field">
+              <label for="rf-port">Serial Port / Device</label>
+              <select class="control-select" id="rf-port">
+                <option value="COM3" selected>COM3 (USB-to-Serial RF Dongle)</option>
+                <option value="COM1">COM1 (Standard Serial Port)</option>
+                <option value="COM4">COM4 (Tactical LoRa Modem)</option>
+                <option value="/dev/ttyUSB0">/dev/ttyUSB0 (Linux / Jetson RF Node)</option>
+              </select>
+              <div class="form-hint">Physical port connected to the RF transmitter module.</div>
+            </div>
+
+            <div class="control-field">
+              <label for="rf-baud">Baud Rate (bps)</label>
+              <select class="control-select" id="rf-baud">
+                <option value="9600" selected>9600 bps (Military Standard Long-Range)</option>
+                <option value="19200">19200 bps</option>
+                <option value="38400">38400 bps</option>
+                <option value="115200">115200 bps (High-Speed Packet)</option>
+              </select>
+            </div>
+
+            <div class="control-field">
+              <label for="rf-freq">Operating Frequency (MHz)</label>
+              <input class="control-input" type="number" step="0.005" id="rf-freq" value="433.050" />
+              <div class="form-hint">Tactical UHF band frequency (e.g. 433.050 MHz).</div>
+            </div>
+
+            <div class="control-field">
+              <label for="rf-channel">Transmission Channel</label>
+              <select class="control-select" id="rf-channel">
+                <option value="1">Channel 01 (433.000 MHz)</option>
+                <option value="3">Channel 03 (433.025 MHz)</option>
+                <option value="5" selected>Channel 05 (433.050 MHz - Primary Defense)</option>
+                <option value="8">Channel 08 (433.080 MHz)</option>
+                <option value="12">Channel 12 (433.120 MHz)</option>
+              </select>
+            </div>
+
+            <div class="control-field form-group-full">
+              <button class="btn-generate-report" style="width:100%;" onclick="saveRFParameters()">
+                <span>💾</span> Save RF Configuration &amp; Sync 5 Units
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: 30-Second Physical Siren Controller -->
+        <div class="setup-card">
+          <div class="setup-card__header">
+            <h3 class="setup-card__title">
+              <span>🚨</span> Physical Siren Relay Controller
+            </h3>
+            <span class="meta-pill" style="color:#ff6b81;">30 SEC BLAST</span>
+          </div>
+
+          <div class="siren-monitor-card">
+            <div style="font-size:0.75rem; color:var(--color-muted); text-transform:uppercase; letter-spacing:0.06em; font-weight:700;">
+              Siren Status: <span id="siren-card-status" style="color:var(--status-ok);">ARMED (STANDBY)</span>
+            </div>
+
+            <div class="siren-timer-circle" id="siren-dial-ring">
+              <div class="siren-timer-val" id="siren-countdown-display">30s</div>
+              <div class="siren-timer-label">ALARM DURATION</div>
+            </div>
+
+            <p style="font-size:0.73rem; color:var(--color-muted); max-width:320px; line-height:1.4;">
+              On confirmed drone detection, the physical siren relay triggers automatically for <strong>30 seconds</strong>. Sound can be auditioned below or silenced at any moment.
+            </p>
+
+            <div class="siren-action-btns">
+              <button class="btn-siren-test" onclick="testSirenAlarm()">
+                <span>🚨</span> Test 30s Siren Blast
+              </button>
+              <button class="btn-siren-stop" onclick="stopSirenAlarm()">
+                <span>🔇</span> Emergency Mute Siren
+              </button>
+            </div>
+          </div>
+
+          <div class="report-recommendations" style="margin-top:1rem; padding:0.85rem 1rem;">
+            <div style="display:flex; justify-content:space-between; font-size:0.74rem;">
+              <span style="color:var(--color-muted);">Relay Hardware Pin:</span>
+              <strong style="color:var(--color-light); font-family:var(--font-mono);">GPIO Pin 17 (BCM) / Solid-State Relay</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:0.74rem; margin-top:0.3rem;">
+              <span style="color:var(--color-muted);">Siren Acoustic Output:</span>
+              <strong style="color:var(--color-accent); font-family:var(--font-mono);">125 dB High-Output Audible Strobe</strong>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Pre-Recorded Message Studio -->
+      <div class="setup-card" style="margin-bottom:1.5rem;">
+        <div class="setup-card__header">
+          <h3 class="setup-card__title">
+            <span>🎙️</span> Pre-Recorded Tactical Voice Message Dispatcher
+          </h3>
+          <span class="meta-pill" style="color:var(--color-accent);">VOICE &amp; DATA</span>
+        </div>
+
+        <div class="form-grid-2col" style="align-items:flex-end;">
+          <div class="control-field form-group-full">
+            <label for="rf-preset-select">Select Tactical Pre-Recorded Template</label>
+            <select class="control-select" id="rf-preset-select" onchange="applyRFPreset(this.value)">
+              <option value="preset1" selected>Preset 1: "Hostile aerial drone detected at sector {sector}, bearing {bearing} deg. All 5 units initiate combat air surveillance."</option>
+              <option value="preset2">Preset 2: "CODE RED: Aerial threat confirmed in perimeter airspace. Quick Reaction Force mobilize immediately."</option>
+              <option value="preset3">Preset 3: "AIR DEFENCE WARNING: Unidentified UAS target approaching at high speed. All 5 units take defensive postures."</option>
+            </select>
+          </div>
+
+          <div class="control-field form-group-full">
+            <label for="rf-msg-text">Broadcast Voice Message (Vocalized over 5 RF Units)</label>
+            <textarea class="control-input" id="rf-msg-text" rows="2" style="font-family:var(--font-mono); font-size:0.82rem; resize:vertical;">TACTICAL ALERT: Hostile aerial drone detected at sector {sector}, bearing {bearing} deg. All 5 units initiate combat air surveillance.</textarea>
+            <div class="form-hint">Dynamic tokens: {sector} = Camera sector, {bearing} = Compass bearing, {time} = Timestamp, {conf} = Confidence.</div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:1rem;">
+          <button class="btn-evidence-play" style="flex:initial; padding:0.55rem 1.25rem;" onclick="speakPreRecordedMessage()">
+            <span>🔊</span> Hear Pre-Recorded Voice Preview (Browser Speaker)
+          </button>
+          <button class="btn-generate-report" style="padding:0.55rem 1.4rem;" onclick="broadcastRFTest()">
+            <span>📡</span> Broadcast Alert to All 5 RF Units Simultaneously
+          </button>
+        </div>
+      </div>
+
+      <!-- Simultaneous 5-Unit Network Grid -->
+      <div class="setup-card">
+        <div class="setup-card__header">
+          <h3 class="setup-card__title">
+            <span>🌐</span> Simultaneous 5-Unit RF Receiver Network (Target Nodes)
+          </h3>
+          <span class="meta-pill" style="color:var(--status-ok);">5 / 5 UNITS CONNECTED</span>
+        </div>
+
+        <div class="rf-units-grid" id="rf-units-container">
+          <!-- Dynamically populated 5 RF unit cards -->
+        </div>
+
+        <!-- RF Packet Console -->
+        <div style="margin-top:1.25rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
+            <span style="font-size:0.72rem; color:var(--color-muted); font-weight:700; text-transform:uppercase;">
+              RF Comset Serial Transmission &amp; Delivery Log
+            </span>
+            <span style="font-size:0.7rem; color:var(--color-dim); font-family:var(--font-mono);" id="rf-last-tx-time">Last TX: None</span>
+          </div>
+          <div class="event-log-container" id="rf-tx-log" style="height:110px; font-family:var(--font-mono); font-size:0.72rem;">
+            <div class="event-item">
+              <span class="event-item__time">SYSTEM</span>
+              <span class="event-badge event-badge--sys">READY</span>
+              <span class="event-item__text">RF Comset initialized on COM3 @ 9600 Baud. 5 Units (RF-01 to RF-05) enrolled on Channel 5.</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ═══════════ LIGHTBOX MODAL (VIDEO & SNAPSHOT VIEWER) ═══════════ -->
+  <div class="lightbox-modal" id="lightbox-modal" onclick="closeLightbox(event)">
+    <div class="lightbox-content" onclick="event.stopPropagation()">
+      <button class="lightbox-close-btn" onclick="closeLightbox(event)">✕</button>
+      <img id="lightbox-img" src="" alt="Drone Snapshot Detail" style="display:none;" />
+      <video id="lightbox-video" controls autoplay playsinline style="display:none; max-width:85vw; max-height:75vh; border-radius:8px; border:2px solid var(--color-crimson); box-shadow:0 12px 40px rgba(0,0,0,0.85);"></video>
+      <div id="lightbox-caption" style="margin-top:0.75rem; text-align:center; font-family:var(--font-mono); font-size:0.8rem; color:var(--color-light);"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════ TOAST NOTIFICATION ═══════════ -->
+  <div class="tactical-toast" id="tactical-toast">
+    <span style="font-size:1.2rem;">⚠️</span>
+    <span id="toast-message">Tactical notification message</span>
+  </div>
+
+  <!-- ═══════════ JAVASCRIPT LOGIC ═══════════ -->
+  <script>
+    // ── Brand Color Palette Constants ──────────────────────────
+    const THEME = {
+      primary:    '#680202',
+      secondary:  '#9A1E23',
+      accent:     '#F3A5AD',
+      dark:       '#1A0A0B',
+      darkCard:   '#240F11',
+      light:      '#F7F4F1',
+      muted:      '#D4B2B6',
+      dim:        '#8F6A6E',
+      cyan:       '#2EC4B6',
+      gold:       '#FF9F1C',
+      danger:     '#E71D36'
+    };
+
+    let activeScope = 'weekly';
+    let activeCameraFilter = 'all';
+    let hudActive = true;
+    let toastTimer = null;
+    let currentReportData = null;
+
+    // ── Navigation Tabs ─────────────────────────────────────────
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        const targetId = btn.getAttribute('data-tab');
+        const targetEl = document.getElementById(targetId);
+        if (targetEl) targetEl.classList.add('active');
+
+        if (targetId === 'tab-analytics') {
+          setTimeout(initPlotlyCharts, 50);
+        } else if (targetId === 'tab-reports' && !currentReportData) {
+          generateReport();
+        } else if (targetId === 'tab-gallery') {
+          loadEvidenceVault();
+        } else if (targetId === 'tab-camera-setup') {
+          loadCameraConfig();
+        } else if (targetId === 'tab-rf-siren') {
+          loadRFComsetStatus();
+          loadSirenStatus();
+        }
+      });
+    });
+
+    // ── Live Clock ──────────────────────────────────────────────
+    function updateClock() {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-GB', { hour12: false }) + ' UTC+5';
+      const el = document.getElementById('nav-clock');
+      if (el) el.textContent = timeStr;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ── HUD Toggle ──────────────────────────────────────────────
+    function toggleHUD() {
+      hudActive = !hudActive;
+      const huds = document.querySelectorAll('.tactical-hud');
+      huds.forEach(h => h.style.display = hudActive ? 'block' : 'none');
+      const btn = document.getElementById('btn-toggle-hud');
+      if (btn) {
+        btn.classList.toggle('active', hudActive);
+        btn.innerHTML = hudActive ? '<span>🎯</span> HUD Overlay: ON' : '<span>🎯</span> HUD Overlay: OFF';
+      }
+    }
+
+    // ── Toast Notification ──────────────────────────────────────
+    function showToast(msg) {
+      const toast = document.getElementById('tactical-toast');
+      const text = document.getElementById('toast-message');
+      if (toast && text) {
+        text.textContent = msg;
+        toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove('show'), 4000);
+      }
+    }
+
+    // ── Alert Banner ────────────────────────────────────────────
+    function triggerTestAlert() {
+      const banner = document.getElementById('incursion-banner');
+      const text = document.getElementById('banner-text');
+      if (banner && text) {
+        text.textContent = 'SIMULATED ALERT: QUADCOPTER IDENTIFIED BY CAM 01 [BEARING: 045.2°] — SIREN ARMED (30s)';
+        banner.classList.add('active');
+        startSirenCountdown(30);
+        playBrowserSirenSound(30);
+        document.querySelectorAll('.rf-unit-card').forEach(c => c.classList.add('active-alert'));
+        setTimeout(() => {
+          document.querySelectorAll('.rf-unit-card').forEach(c => c.classList.remove('active-alert'));
+        }, 4000);
+        showToast('30-Second Siren Alarm + Simultaneous 5-Unit RF Broadcast Triggered!');
+      }
+    }
+
+    function dismissAlert() {
+      const banner = document.getElementById('incursion-banner');
+      if (banner) banner.classList.remove('active');
+    }
+
+    // ── Snapshot Action ─────────────────────────────────────────
+    function captureSnapshot(camId) {
+      showToast(`Snapshot captured from ${camId.toUpperCase()} and stored to logs/snapshots!`);
+    }
+
+    function toggleNightFilter(camId) {
+      showToast(`Sensor filter recalibrated for ${camId.toUpperCase()}!`);
+    }
+
+    // ── Event Log ───────────────────────────────────────────────
+    function clearEventLog() {
+      const container = document.getElementById('event-log-container');
+      if (container) {
+        container.innerHTML = '<div style="color:var(--color-dim); padding:1rem; text-align:center;">Event log cleared. Monitoring active...</div>';
+      }
+    }
+
+    function appendEventLog(ev) {
+      const container = document.getElementById('event-log-container');
+      if (!container) return;
+      const item = document.createElement('div');
+      item.className = 'event-item';
+      const timeStr = new Date(ev.timestamp || Date.now()).toLocaleTimeString('en-GB', {hour12:false});
+      item.innerHTML = `
+        <span class="event-item__time">${timeStr}</span>
+        <span class="event-badge event-badge--detect">DETECT</span>
+        <span class="event-item__text">${ev.camera_id}: Target bearing ${ev.bearing_deg || 45}° (Confidence: 96%)</span>
+        <button class="ctrl-btn" style="padding:0.2rem 0.5rem;" onclick="showToast('Snapshot archived')">🖼️</button>
+      `;
+      container.prepend(item);
+    }
+
+    // ── SSE Stream ──────────────────────────────────────────────
+    function initSSE() {
+      try {
+        const es = new EventSource('/api/events');
+        es.onopen = () => {
+          const dot = document.getElementById('stream-dot');
+          const txt = document.getElementById('conn-text');
+          if (dot) dot.style.background = THEME.cyan;
+          if (txt) txt.textContent = 'SECURE LINK LIVE';
+        };
+        es.onmessage = (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            if (data.event === 'detection' || data.event === 'telemetry') {
+              // Real-Time Telemetry Table & Tactical Radar Update
+              updateTelemetryTable(data);
+              updateAirspaceRadar(data);
+
+              appendEventLog(data);
+              showToast(`🚨 Hostile target detected on ${data.camera_id || 'CAM 01'}! [BRG: ${(data.bearing_deg || 100.1).toFixed(1)}° | DST: ${(data.distance_m || 85).toFixed(0)}m]`);
+              startSirenCountdown(30);
+              playBrowserSirenSound(30);
+
+              const banner = document.getElementById('incursion-banner');
+              const bText = document.getElementById('banner-text');
+              if (banner && bText) {
+                const brgVal = (data.bearing_deg || 100.1).toFixed(1);
+                const dstVal = (data.distance_m || 85).toFixed(0);
+                const gndVal = (data.ground_distance_m || 84).toFixed(0);
+                const latVal = (data.drone_lat || 33.685123).toFixed(5);
+                const lonVal = (data.drone_lon || 73.048934).toFixed(5);
+                bText.textContent = `TACTICAL ALERT: AERIAL DRONE DETECTED [BRG: ${brgVal}° | DST: ${dstVal}m | GND: ${gndVal}m | GPS: ${latVal}, ${lonVal}] — 30s SIREN SOUNDING`;
+                banner.classList.add('active');
+              }
+
+              // Flash all 5 RF units cards
+              document.querySelectorAll('.rf-unit-card').forEach(c => c.classList.add('active-alert'));
+              setTimeout(() => {
+                document.querySelectorAll('.rf-unit-card').forEach(c => c.classList.remove('active-alert'));
+              }, 4000);
+
+              // Prepend newly captured evidence video
+              setTimeout(loadEvidenceVideos, 1500);
+            } else if (data.event === 'telemetry_clear') {
+              clearLiveTelemetryAndRadar(true);
+            }
+          } catch (err) {
+            console.error('SSE Message parsing error:', err);
+          }
+        };
+        es.onerror = () => {
+          const dot = document.getElementById('stream-dot');
+          const txt = document.getElementById('conn-text');
+          if (dot) dot.style.background = THEME.danger;
+          if (txt) txt.textContent = 'RECONNECTING...';
+        };
+      } catch (err) {
+        console.warn('SSE connection unavailable:', err);
+      }
+    }
+    initSSE();
+
+    // ═════════════════════════════════════════════════════════════
+    // REAL-TIME TELEMETRY TABLE & TACTICAL PPI AIRSPACE RADAR
+    // ═════════════════════════════════════════════════════════════
+
+    let trackedTargets = {};
+    let currentRadarRange = 100; // in meters (default 100m)
+    let radarSweepActive = true;
+    let cameraBaseGPS = { lat: 33.684400, lon: 73.047900, heading: 90.0 };
+
+    function getCardinalDirection(deg) {
+      const d = ((deg % 360) + 360) % 360;
+      if (d >= 337.5 || d < 22.5) return 'N';
+      if (d >= 22.5 && d < 67.5) return 'NE';
+      if (d >= 67.5 && d < 112.5) return 'E';
+      if (d >= 112.5 && d < 157.5) return 'SE';
+      if (d >= 157.5 && d < 202.5) return 'S';
+      if (d >= 202.5 && d < 247.5) return 'SW';
+      if (d >= 247.5 && d < 292.5) return 'W';
+      return 'NW';
+    }
+
+    function updateTelemetryTable(t) {
+      const tbody = document.getElementById('telemetry-table-body');
+      const badge = document.getElementById('telemetry-target-count-badge');
+      const countTxt = document.getElementById('telemetry-count-text');
+      if (!tbody) return;
+
+      const emptyRow = document.getElementById('telemetry-empty-row');
+      if (emptyRow) emptyRow.remove();
+
+      const tid = String(t.track_id || t.target_id || 'TGT-#01');
+      const camId = t.camera_id === 'secondary' ? 'CAM 02 (Thermal FLIR)' : 'CAM 01 (Optical HD)';
+      const brg = parseFloat(t.bearing_deg !== undefined ? t.bearing_deg : (t.bearing || 90.0));
+      const az = parseFloat(t.azimuth_deg !== undefined ? t.azimuth_deg : 0.0);
+      const slant = parseFloat(t.distance_m || t.slant_distance_m || 85.0);
+      const gnd = parseFloat(t.ground_distance_m || (slant * Math.cos(8.6 * Math.PI / 180)));
+      const alt = parseFloat(t.altitude_m !== undefined ? t.altitude_m : (t.drone_altitude_m || 12.0));
+      const lat = parseFloat(t.drone_lat || t.lat || 33.685123);
+      const lon = parseFloat(t.drone_lon || t.lon || 73.048934);
+      const conf = t.confidence || 'HIGH (96.4%)';
+      const timeStr = t.timestamp || new Date().toLocaleTimeString('en-GB', { hour12: false });
+      const cardinal = getCardinalDirection(brg);
+
+      // Save to local registry
+      trackedTargets[tid] = {
+        tid, camId, brg, az, slant, gnd, alt, lat, lon, conf, timeStr,
+        updated: Date.now()
+      };
+
+      // Check if row already exists
+      let row = document.getElementById(`tgt-row-${tid.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
+      if (!row) {
+        row = document.createElement('tr');
+        row.id = `tgt-row-${tid.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+        tbody.prepend(row);
+      }
+
+      row.className = 'active-track';
+      row.innerHTML = `
+        <td><span class="tgt-pill">🛸 ${tid}</span></td>
+        <td><span style="color:var(--color-accent); font-weight:600;">${camId}</span></td>
+        <td><strong>${brg.toFixed(1)}° (${cardinal})</strong> <span style="font-size:0.7rem; color:var(--color-muted);">[Az: ${az >= 0 ? '+' : ''}${az.toFixed(1)}°]</span></td>
+        <td><span style="color:#ffd166; font-weight:700;">${slant.toFixed(1)} m</span></td>
+        <td><span style="color:#06d6a0; font-weight:700;">${gnd.toFixed(1)} m</span></td>
+        <td><span style="color:#118ab2; font-weight:700;">${alt >= 0 ? '+' : ''}${alt.toFixed(1)} m</span></td>
+        <td><span class="gps-badge" onclick="copyGPS('${lat.toFixed(6)}, ${lon.toFixed(6)}')">📍 ${lat.toFixed(6)}, ${lon.toFixed(6)}</span></td>
+        <td><span class="lock-pill">LOCKED [8/8]</span></td>
+        <td style="color:var(--color-muted);">${timeStr}</td>
+      `;
+
+      // Update badge
+      const activeCount = Object.keys(trackedTargets).length;
+      if (badge && countTxt) {
+        badge.classList.add('has-targets');
+        countTxt.textContent = `${activeCount} TARGET${activeCount > 1 ? 'S' : ''} LOCKED`;
+      }
+    }
+
+    function updateAirspaceRadar(t) {
+      const container = document.getElementById('radar-blips-container');
+      const footerTxt = document.getElementById('radar-summary-target');
+      if (!container) return;
+
+      const tid = String(t.track_id || t.target_id || 'TGT-#01');
+      const brg = parseFloat(t.bearing_deg !== undefined ? t.bearing_deg : (t.bearing || 90.0));
+      const gnd = parseFloat(t.ground_distance_m || (parseFloat(t.distance_m || 85.0) * 0.98));
+      const alt = parseFloat(t.altitude_m !== undefined ? t.altitude_m : (t.drone_altitude_m || 12.0));
+
+      // Calculate Polar coordinates on scope screen
+      // 0 deg = North (top), 90 deg = East (right), 180 deg = South (bottom), 270 deg = West (left)
+      const rad = brg * Math.PI / 180.0;
+      const normalizedDist = Math.min(1.0, gnd / currentRadarRange);
+      const radiusPct = normalizedDist * 44.0; // 44% of scope radius (leaves room for outer compass bezel)
+      const xPct = 50.0 + radiusPct * Math.sin(rad);
+      const yPct = 50.0 - radiusPct * Math.cos(rad);
+
+      let blip = document.getElementById(`radar-blip-${tid.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
+      if (!blip) {
+        blip = document.createElement('div');
+        blip.className = 'radar-blip';
+        blip.id = `radar-blip-${tid.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+        blip.title = `Target: ${tid} | Bearing: ${brg.toFixed(1)}° | Ground: ${gnd.toFixed(1)}m | Alt: ${alt.toFixed(1)}m`;
+        blip.innerHTML = `
+          <div class="radar-blip__pulse-ring"></div>
+          <div class="radar-blip__icon-box">
+            <svg class="radar-blip__svg" viewBox="0 0 24 24">
+              <!-- Military Quadcopter Drone SVG Silhouette -->
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M7 7l10 10M17 7L7 17" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="6" cy="6" r="2.5" fill="none" stroke="#ffffff" stroke-width="1.5"/>
+              <circle cx="18" cy="6" r="2.5" fill="none" stroke="#ffffff" stroke-width="1.5"/>
+              <circle cx="6" cy="18" r="2.5" fill="none" stroke="#ffffff" stroke-width="1.5"/>
+              <circle cx="18" cy="18" r="2.5" fill="none" stroke="#ffffff" stroke-width="1.5"/>
+            </svg>
+          </div>
+          <div class="radar-blip__tag" id="radar-blip-tag-${tid.replace(/[^a-zA-Z0-9_-]/g, '_')}">
+            ${tid} | ${Math.round(gnd)}m | ${Math.round(brg)}°
+          </div>
+        `;
+        container.appendChild(blip);
+      }
+
+      // Smoothly update position
+      blip.style.left = `${xPct}%`;
+      blip.style.top = `${yPct}%`;
+
+      const tag = document.getElementById(`radar-blip-tag-${tid.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
+      if (tag) {
+        tag.textContent = `${tid} | ${Math.round(gnd)}m | ${Math.round(brg)}° | ALT ${Math.round(alt)}m`;
+      }
+
+      if (footerTxt) {
+        footerTxt.innerHTML = `<span style="color:#ff4757; font-weight:800; animation:pulseDot 1s infinite;">🚨 TARGET ${tid}: ${Math.round(gnd)}m @ ${brg.toFixed(1)}° (${getCardinalDirection(brg)}) | ALT: ${alt.toFixed(1)}m</span>`;
+      }
+    }
+
+    function setRadarRange(rangeM, btn) {
+      currentRadarRange = rangeM;
+      if (btn) {
+        btn.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      }
+      const r1 = document.getElementById('radar-lbl-r1');
+      const r2 = document.getElementById('radar-lbl-r2');
+      const r3 = document.getElementById('radar-lbl-r3');
+      const r4 = document.getElementById('radar-lbl-r4');
+      if (r1) r1.textContent = `${Math.round(rangeM * 0.25)}m`;
+      if (r2) r2.textContent = `${Math.round(rangeM * 0.50)}m`;
+      if (r3) r3.textContent = `${Math.round(rangeM * 0.75)}m`;
+      if (r4) r4.textContent = `${rangeM}m`;
+
+      // Reposition all active targets on new radar scale
+      Object.values(trackedTargets).forEach(t => {
+        updateAirspaceRadar(t);
+      });
+      showToast(`Tactical Radar Scope scale set to ${rangeM}m radius.`);
+    }
+
+    function toggleRadarSweep() {
+      const beam = document.getElementById('radar-sweep-beam');
+      const btn = document.getElementById('btn-radar-sweep-toggle');
+      if (!beam || !btn) return;
+      radarSweepActive = !radarSweepActive;
+      if (radarSweepActive) {
+        beam.style.display = 'block';
+        btn.innerHTML = '<span>🔄</span> Sweep: ON';
+        btn.classList.add('active');
+      } else {
+        beam.style.display = 'none';
+        btn.innerHTML = '<span>⏸️</span> Sweep: OFF';
+        btn.classList.remove('active');
+      }
+    }
+
+    function clearLiveTelemetryAndRadar(skipServer) {
+      trackedTargets = {};
+      const container = document.getElementById('radar-blips-container');
+      if (container) container.innerHTML = '';
+
+      const tbody = document.getElementById('telemetry-table-body');
+      if (tbody) {
+        tbody.innerHTML = `
+          <tr id="telemetry-empty-row">
+            <td colspan="9" class="telemetry-empty-row">
+              📡 Airspace clear. Dual camera optical/thermal sensors scanning for targets...
+            </td>
+          </tr>
+        `;
+      }
+
+      const badge = document.getElementById('telemetry-target-count-badge');
+      const countTxt = document.getElementById('telemetry-count-text');
+      if (badge && countTxt) {
+        badge.classList.remove('has-targets');
+        countTxt.textContent = '0 TARGETS LOCKED';
+      }
+
+      const footerTxt = document.getElementById('radar-summary-target');
+      if (footerTxt) footerTxt.textContent = 'AIRSPACE CLEAR';
+
+      if (!skipServer) {
+        fetch('/api/telemetry/clear', { method: 'POST' }).catch(() => {});
+        showToast('All targets cleared from Radar & Telemetry stream.');
+      }
+    }
+
+    function copyGPS(coords) {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(coords);
+        showToast(`Copied GPS Coordinates [${coords}] to clipboard!`);
+      }
+    }
+
+    // Interactive Demo Flight Simulation for Operator Verification
+    let simInterval = null;
+    function simulateHostileDroneFlight() {
+      if (simInterval) {
+        clearInterval(simInterval);
+        simInterval = null;
+        showToast('Drone simulation stopped.');
+        return;
+      }
+
+      showToast('🚀 Launching Inbound Hostile Drone Simulation (#01)... Watch Telemetry Table & Radar!');
+      let currentDist = 140.0;
+      let currentBrg = 96.0;
+      let steps = 0;
+
+      simInterval = setInterval(() => {
+        currentDist -= 5.5; // Drone approaching towards camera
+        currentBrg += 0.8;  // Drifting slightly east-southeast
+        steps++;
+
+        const simulatedPayload = {
+          target_id: 'TGT-#01',
+          drone_type: 'DJI Phantom 4 Pro',
+          camera_id: 'primary',
+          distance_m: Math.max(12.0, currentDist),
+          bearing_deg: currentBrg,
+          elevation_deg: 8.6,
+        };
+
+        fetch('/api/telemetry/simulate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(simulatedPayload)
+        }).catch(err => {
+          // Fallback direct UI update if server offline
+          updateTelemetryTable(simulatedPayload);
+          updateAirspaceRadar(simulatedPayload);
+        });
+
+        if (currentDist <= 20.0 || steps >= 25) {
+          clearInterval(simInterval);
+          simInterval = null;
+          showToast('🎯 Hostile drone simulated pass completed (Perimeter boundary reached).');
+        }
+      }, 700);
+    }
+
+    // Auto-fetch active targets on startup
+    async function loadActiveTelemetryOnStartup() {
+      try {
+        const res = await fetch('/api/telemetry/active');
+        const data = await res.json();
+        if (data && data.camera_base) {
+          cameraBaseGPS = {
+            lat: data.camera_base.latitude,
+            lon: data.camera_base.longitude,
+            heading: data.camera_base.heading_deg
+          };
+          const pin = document.getElementById('radar-center-base');
+          if (pin) pin.title = `Base Camera: ${cameraBaseGPS.lat}°N, ${cameraBaseGPS.lon}°E | Heading: ${cameraBaseGPS.heading}°`;
+          const baseLbl = document.querySelector('#radar-footer-telemetry span');
+          if (baseLbl) baseLbl.textContent = `📍 BASE: ${cameraBaseGPS.lat}°N, ${cameraBaseGPS.lon}°E`;
+        }
+        if (data && data.targets && data.targets.length > 0) {
+          data.targets.forEach(t => {
+            updateTelemetryTable(t);
+            updateAirspaceRadar(t);
+          });
+        }
+      } catch {}
+    }
+    setTimeout(loadActiveTelemetryOnStartup, 800);
+
+    // ═════════════════════════════════════════════════════════════
+    // PLOTLY CHARTS IMPLEMENTATION (With User Brand Color Scheme)
+    // ═════════════════════════════════════════════════════════════
+
+    const plotlyLayoutBase = {
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor:  'rgba(0,0,0,0)',
+      font: {
+        family: 'Poppins, sans-serif',
+        color:  THEME.muted,
+        size:   11
+      },
+      margin: { l: 45, r: 25, t: 30, b: 40 },
+      xaxis: {
+        gridcolor: 'rgba(243, 165, 173, 0.1)',
+        tickcolor: 'rgba(243, 165, 173, 0.2)',
+        color:     THEME.muted,
+      },
+      yaxis: {
+        gridcolor: 'rgba(243, 165, 173, 0.1)',
+        tickcolor: 'rgba(243, 165, 173, 0.2)',
+        color:     THEME.muted,
+      },
+      legend: {
+        font: { color: THEME.light, size: 11 },
+        bgcolor: 'rgba(26, 10, 11, 0.65)',
+        bordercolor: THEME.secondary,
+        borderwidth: 1
+      },
+      hoverlabel: {
+        bgcolor: THEME.darkCard,
+        bordercolor: THEME.accent,
+        font: { family: 'Poppins', color: THEME.light }
+      }
+    };
+
+    async function initPlotlyCharts() {
+      await renderMainTimelineChart();
+      renderThreatCompositionChart();
+      renderBearingPolarChart();
+      renderHourlyHeatmapChart();
+      renderCapabilityRadarChart();
+    }
+
+    // ── 1. Main Timeline Chart (Weekly / Monthly / Yearly) ──────
+    async function renderMainTimelineChart() {
+      const container = document.getElementById('plotly-main-timeline');
+      if (!container) return;
+
+      const camLabel = activeCameraFilter === 'primary'
+        ? '[Camera 01: North Perimeter Optical HD]'
+        : (activeCameraFilter === 'secondary'
+          ? '[Camera 02: East Sector FLIR Thermal]'
+          : '[Dual Camera Multi-Sensor Coverage]');
+
+      let traces = [];
+      let title = '';
+
+      if (activeScope === 'yearly') {
+        const r = await fetch(`/api/analytics/yearly?camera=${activeCameraFilter}`);
+        const data = await r.json();
+        title = `Yearly Aerial Incursion Trajectory ${camLabel}`;
+        document.getElementById('main-chart-title').textContent = title;
+
+        if (activeCameraFilter === 'all') {
+          traces.push({
+            x: data.months,
+            y: data.year_2026,
+            name: '2026 Current Year (Combined)',
+            type: 'scatter',
+            mode: 'lines+markers',
+            line: { color: THEME.accent, width: 3, shape: 'spline' },
+            fill: 'tozeroy',
+            fillcolor: 'rgba(243, 165, 173, 0.14)',
+            marker: { size: 6, color: THEME.accent }
+          });
+          traces.push({
+            x: data.months,
+            y: data.year_2025,
+            name: '2025 Historical Baseline',
+            type: 'scatter',
+            mode: 'lines+markers',
+            line: { color: THEME.secondary, width: 2, dash: 'dot', shape: 'spline' },
+            marker: { size: 5, color: THEME.secondary }
+          });
+        } else if (activeCameraFilter === 'primary') {
+          traces.push({
+            x: data.months,
+            y: data.year_2026,
+            name: 'Cam 01 (North Optical 2026)',
+            type: 'scatter',
+            mode: 'lines+markers',
+            line: { color: THEME.accent, width: 3.5, shape: 'spline' },
+            fill: 'tozeroy',
+            fillcolor: 'rgba(243, 165, 173, 0.18)',
+            marker: { size: 7, color: THEME.accent }
+          });
+        } else {
+          traces.push({
+            x: data.months,
+            y: data.year_2026,
+            name: 'Cam 02 (East Thermal 2026)',
+            type: 'scatter',
+            mode: 'lines+markers',
+            line: { color: THEME.secondary, width: 3.5, shape: 'spline' },
+            fill: 'tozeroy',
+            fillcolor: 'rgba(154, 30, 35, 0.25)',
+            marker: { size: 7, color: THEME.secondary }
+          });
+        }
+
+      } else if (activeScope === 'monthly') {
+        const r = await fetch(`/api/analytics/monthly?camera=${activeCameraFilter}`);
+        const data = await r.json();
+        title = `Monthly Daily Incursions ${camLabel} (October 2026)`;
+        document.getElementById('main-chart-title').textContent = title;
+
+        if (activeCameraFilter === 'all') {
+          traces.push({
+            x: data.labels,
+            y: data.quadcopter,
+            name: 'Quadcopter Detections',
+            type: 'bar',
+            marker: { color: THEME.secondary }
+          });
+          traces.push({
+            x: data.labels,
+            y: data.fixed_wing,
+            name: 'Fixed-Wing / FPV',
+            type: 'bar',
+            marker: { color: THEME.accent }
+          });
+        } else if (activeCameraFilter === 'primary') {
+          traces.push({
+            x: data.labels,
+            y: data.total,
+            name: 'Cam 01 Optical Detections',
+            type: 'bar',
+            marker: { color: THEME.accent }
+          });
+        } else {
+          traces.push({
+            x: data.labels,
+            y: data.total,
+            name: 'Cam 02 Thermal Incursions',
+            type: 'bar',
+            marker: { color: THEME.secondary }
+          });
+        }
+
+      } else {
+        // Weekly (default)
+        const r = await fetch(`/api/analytics/weekly?camera=${activeCameraFilter}`);
+        const data = await r.json();
+        title = `Weekly Aerial Incursion Trajectory ${camLabel}`;
+        document.getElementById('main-chart-title').textContent = title;
+
+        if (activeCameraFilter === 'all') {
+          traces.push({
+            x: data.labels,
+            y: data.camera1,
+            name: 'Cam 01 (North Optical)',
+            type: 'scatter',
+            mode: 'lines+markers',
+            line: { color: THEME.accent, width: 3, shape: 'spline' },
+            fill: 'tozeroy',
+            fillcolor: 'rgba(243, 165, 173, 0.15)',
+            marker: { size: 7, color: THEME.accent }
+          });
+          traces.push({
+            x: data.labels,
+            y: data.camera2,
+            name: 'Cam 02 (East Thermal)',
+            type: 'scatter',
+            mode: 'lines+markers',
+            line: { color: THEME.secondary, width: 3, shape: 'spline' },
+            fill: 'tozeroy',
+            fillcolor: 'rgba(154, 30, 35, 0.2)',
+            marker: { size: 7, color: THEME.secondary }
+          });
+        } else if (activeCameraFilter === 'primary') {
+          traces.push({
+            x: data.labels,
+            y: data.active_counts,
+            name: 'Camera 01 (North Optical Only)',
+            type: 'scatter',
+            mode: 'lines+markers',
+            line: { color: THEME.accent, width: 3.5, shape: 'spline' },
+            fill: 'tozeroy',
+            fillcolor: 'rgba(243, 165, 173, 0.22)',
+            marker: { size: 8, color: THEME.accent }
+          });
+        } else {
+          traces.push({
+            x: data.labels,
+            y: data.active_counts,
+            name: 'Camera 02 (East Thermal Only)',
+            type: 'scatter',
+            mode: 'lines+markers',
+            line: { color: THEME.secondary, width: 3.5, shape: 'spline' },
+            fill: 'tozeroy',
+            fillcolor: 'rgba(154, 30, 35, 0.3)',
+            marker: { size: 8, color: THEME.secondary }
+          });
+        }
+      }
+
+      const layout = {
+        ...plotlyLayoutBase,
+        barmode: (activeScope === 'monthly' && activeCameraFilter === 'all') ? 'stack' : undefined,
+        hovermode: 'x unified'
+      };
+
+      Plotly.newPlot(container, traces, layout, { responsive: true, displayModeBar: false });
+    }
+
+    // ── 2. Threat Composition Donut ─────────────────────────────
+    function renderThreatCompositionChart() {
+      const container = document.getElementById('plotly-threat-composition');
+      if (!container) return;
+
+      let values, labels, colors;
+      if (activeCameraFilter === 'primary') {
+        values = [68, 18, 10, 4];
+        labels = ['Optical Quadcopters (DJI/Autel)', 'Fixed-Wing Scout', 'FPV Micro Drone', 'Unclassified'];
+        colors = [THEME.accent, THEME.secondary, THEME.primary, '#4D2327'];
+      } else if (activeCameraFilter === 'secondary') {
+        values = [32, 28, 30, 10];
+        labels = ['Thermal Signature FPVs', 'High-Speed Fixed Wing', 'Quadcopter Night Flights', 'Stealth/Hot Exhaust'];
+        colors = [THEME.secondary, '#d90429', THEME.accent, '#4D2327'];
+      } else {
+        values = [54, 24, 16, 6];
+        labels = ['Quadcopter (DJI/Autel)', 'Fixed-Wing Scout', 'FPV Micro Drone', 'Unclassified / Stealth'];
+        colors = [THEME.primary, THEME.secondary, THEME.accent, '#4D2327'];
+      }
+
+      const data = [{
+        values: values,
+        labels: labels,
+        type: 'pie',
+        hole: 0.58,
+        marker: { colors: colors },
+        textinfo: 'percent',
+        insidetextfont: { color: THEME.light, family: 'Poppins', size: 10 }
+      }];
+
+      const layout = {
+        ...plotlyLayoutBase,
+        showlegend: true,
+        margin: { l: 15, r: 15, t: 15, b: 15 }
+      };
+
+      Plotly.newPlot(container, data, layout, { responsive: true, displayModeBar: false });
+    }
+
+    // ── 3. 360° Polar Bearing Radar ─────────────────────────────
+    function renderBearingPolarChart() {
+      const container = document.getElementById('plotly-bearing-polar');
+      if (!container) return;
+
+      let rValues;
+      if (activeCameraFilter === 'primary') {
+        // Concentrated in North / North-East (0° to 90°)
+        rValues = [55, 68, 30, 10, 5, 8, 20, 45, 55];
+      } else if (activeCameraFilter === 'secondary') {
+        // Concentrated in East / South-East (90° to 180°)
+        rValues = [8, 15, 62, 45, 38, 35, 18, 10, 8];
+      } else {
+        // Composite 360°
+        rValues = [45, 62, 38, 22, 19, 32, 40, 52, 45];
+      }
+
+      const data = [{
+        type: 'scatterpolar',
+        r: rValues,
+        theta: [0, 45, 90, 135, 180, 225, 270, 315, 360],
+        fill: 'toself',
+        fillcolor: activeCameraFilter === 'secondary' ? 'rgba(154, 30, 35, 0.3)' : 'rgba(243, 165, 173, 0.22)',
+        line: { color: activeCameraFilter === 'secondary' ? THEME.secondary : THEME.accent, width: 2.5 },
+        marker: { color: activeCameraFilter === 'secondary' ? THEME.accent : THEME.secondary, size: 6 }
+      }];
+
+      const layout = {
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor:  'rgba(0,0,0,0)',
+        font: { family: 'Poppins', color: THEME.muted, size: 10 },
+        margin: { l: 30, r: 30, t: 25, b: 25 },
+        polar: {
+          bgcolor: 'rgba(26, 10, 11, 0.5)',
+          radialaxis: {
+            visible: true,
+            gridcolor: 'rgba(243, 165, 173, 0.12)',
+            color: THEME.dim,
+            angle: 45
+          },
+          angularaxis: {
+            gridcolor: 'rgba(243, 165, 173, 0.15)',
+            color: THEME.muted,
+            direction: 'clockwise'
+          }
+        }
+      };
+
+      Plotly.newPlot(container, data, layout, { responsive: true, displayModeBar: false });
+    }
+
+    // ── 4. 24-Hour Peak Incursions ──────────────────────────────
+    function renderHourlyHeatmapChart() {
+      const container = document.getElementById('plotly-hourly-heatmap');
+      if (!container) return;
+
+      const hours = Array.from({length:24}, (_, i) => `${i.toString().padStart(2, '0')}:00`);
+      let counts;
+
+      if (activeCameraFilter === 'primary') {
+        // Daylight peak for Camera 01 (10:00 - 16:00)
+        counts = [1, 0, 0, 0, 2, 4, 7, 12, 16, 11, 9, 10, 8, 7, 9, 11, 12, 10, 8, 6, 4, 3, 2, 1];
+      } else if (activeCameraFilter === 'secondary') {
+        // Dusk & night peak for Camera 02 (17:00 - 23:00)
+        counts = [2, 2, 1, 1, 2, 3, 2, 2, 2, 1, 1, 1, 1, 1, 4, 4, 7, 14, 13, 11, 8, 5, 3, 3];
+      } else {
+        // Combined
+        counts = [3, 2, 1, 1, 4, 7, 9, 14, 18, 12, 10, 11, 9, 8, 13, 15, 19, 24, 21, 17, 12, 8, 5, 4];
+      }
+
+      const colors = counts.map(v => v > 14 ? THEME.accent : (v > 7 ? THEME.secondary : THEME.primary));
+
+      const data = [{
+        x: hours,
+        y: counts,
+        type: 'bar',
+        marker: { color: colors }
+      }];
+
+      const layout = {
+        ...plotlyLayoutBase,
+        xaxis: {
+          ...plotlyLayoutBase.xaxis,
+          tickangle: -45,
+          nticks: 12
+        }
+      };
+
+      Plotly.newPlot(container, data, layout, { responsive: true, displayModeBar: false });
+    }
+
+    // ── 5. Capability Radar Spider ──────────────────────────────
+    function renderCapabilityRadarChart() {
+      const container = document.getElementById('plotly-capability-radar');
+      if (!container) return;
+
+      let currentScores;
+      let labelName;
+
+      if (activeCameraFilter === 'primary') {
+        currentScores = [98, 94, 96, 82, 92, 98, 98];
+        labelName = 'Cam 01 (Optical HD Profile)';
+      } else if (activeCameraFilter === 'secondary') {
+        currentScores = [94, 90, 92, 96, 95, 97, 94];
+        labelName = 'Cam 02 (Thermal FLIR Profile)';
+      } else {
+        currentScores = [96, 92, 95, 88, 94, 98, 96];
+        labelName = 'Dual Sensor Composite Score';
+      }
+
+      const data = [
+        {
+          type: 'scatterpolar',
+          r: currentScores,
+          theta: ['Detection Sensitivity', 'Low Latency', 'Track Consistency', 'Adverse Weather', 'Multi-Target', 'False Alarm Filter', 'Detection Sensitivity'],
+          fill: 'toself',
+          name: labelName,
+          fillcolor: activeCameraFilter === 'secondary' ? 'rgba(154, 30, 35, 0.35)' : 'rgba(243, 165, 173, 0.25)',
+          line: { color: activeCameraFilter === 'secondary' ? THEME.secondary : THEME.accent, width: 2 }
+        },
+        {
+          type: 'scatterpolar',
+          r: [80, 75, 82, 70, 78, 85, 80],
+          theta: ['Detection Sensitivity', 'Low Latency', 'Track Consistency', 'Adverse Weather', 'Multi-Target', 'False Alarm Filter', 'Detection Sensitivity'],
+          name: 'Mil-Std Benchmark',
+          line: { color: THEME.dim, width: 1.5, dash: 'dash' }
+        }
+      ];
+
+      const layout = {
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor:  'rgba(0,0,0,0)',
+        font: { family: 'Poppins', color: THEME.muted, size: 9 },
+        margin: { l: 40, r: 40, t: 25, b: 25 },
+        polar: {
+          bgcolor: 'rgba(26, 10, 11, 0.5)',
+          radialaxis: {
+            visible: true,
+            range: [0, 100],
+            gridcolor: 'rgba(243, 165, 173, 0.12)',
+            color: THEME.dim
+          },
+          angularaxis: {
+            gridcolor: 'rgba(243, 165, 173, 0.15)',
+            color: THEME.light
+          }
+        },
+        legend: {
+          font: { color: THEME.muted, size: 9 },
+          orientation: 'h',
+          y: -0.15
+        }
+      };
+
+      Plotly.newPlot(container, data, layout, { responsive: true, displayModeBar: false });
+    }
+
+    // ── Chart Filter Controls ───────────────────────────────────
+    function switchChartScope(scope, btn) {
+      activeScope = scope;
+      btn.parentElement.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderMainTimelineChart();
+    }
+
+    function filterCameraCharts(cam, btn) {
+      activeCameraFilter = cam;
+      btn.parentElement.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      // Re-render all 5 charts with the selected camera filter
+      initPlotlyCharts();
+
+      const label = cam === 'all'
+        ? 'Both Cameras (Composite)'
+        : (cam === 'primary' ? 'Camera 01 (Optical HD)' : 'Camera 02 (Thermal FLIR)');
+      showToast(`Plotly charts filtered for: ${label}`);
+    }
+
+    function refreshAllPlotlyCharts() {
+      initPlotlyCharts();
+      showToast('All Plotly statistical models refreshed successfully!');
+    }
+
+    // ═════════════════════════════════════════════════════════════
+    // REPORT GENERATOR LOGIC (Weekly / Monthly / Yearly)
+    // ═════════════════════════════════════════════════════════════
+    async function generateReport() {
+      const periodSelect = document.getElementById('report-period-select');
+      const cameraSelect = document.getElementById('report-camera-select');
+      const period = periodSelect ? periodSelect.value : 'weekly';
+      const camera = cameraSelect ? cameraSelect.value : 'all';
+
+      try {
+        const res = await fetch(`/api/reports/generate?period=${period}&camera=${camera}`);
+        const data = await res.json();
+        currentReportData = data;
+
+        // Populate report UI
+        document.getElementById('rep-title').textContent = data.title;
+        document.getElementById('rep-date-range').textContent = `Coverage: ${data.date_range} • Sensor Scope: ${data.camera_scope} • Generated: ${data.generated_at}`;
+        document.getElementById('rep-kpi-total').textContent = data.kpis.total_incidents.toLocaleString();
+        document.getElementById('rep-kpi-high').textContent = data.kpis.high_threat.toLocaleString();
+        document.getElementById('rep-kpi-rate').textContent = data.kpis.intercept_rate;
+        document.getElementById('rep-kpi-range').textContent = data.kpis.avg_range;
+
+        // Render Table Rows
+        const tbody = document.getElementById('report-table-body');
+        if (tbody) {
+          tbody.innerHTML = '';
+          data.table.forEach(row => {
+            const tr = document.createElement('tr');
+            let threatBadge = 'badge-threat-low';
+            if (row.threat === 'CRITICAL' || row.threat === 'HIGH') threatBadge = 'badge-threat-high';
+            else if (row.threat === 'MODERATE') threatBadge = 'badge-threat-mod';
+
+            tr.innerHTML = `
+              <td style="font-weight:600;">${row.period}</td>
+              <td style="font-family:var(--font-mono); font-weight:700;">${row.detections}</td>
+              <td><span class="${threatBadge}">${row.threat}</span></td>
+              <td style="color:var(--status-ok); font-weight:600;">${row.status}</td>
+              <td style="font-family:var(--font-mono);">${row.avg_conf}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+
+        // Render Recommendations
+        const recList = document.getElementById('rep-recommendations-list');
+        if (recList && data.recommendations) {
+          recList.innerHTML = '';
+          data.recommendations.forEach(r => {
+            const li = document.createElement('li');
+            li.textContent = r;
+            recList.appendChild(li);
+          });
+        }
+
+        showToast(`Official ${period.toUpperCase()} Intelligence Report compiled successfully!`);
+      } catch (err) {
+        console.error('Report generation error:', err);
+      }
+    }
+
+    function exportReportCSV() {
+      if (!currentReportData) return;
+      let csv = 'Period Segment,Detections,Threat Tier,Status,AI Confidence\n';
+      currentReportData.table.forEach(r => {
+        csv += `"${r.period}",${r.detections},"${r.threat}","${r.status}","${r.avg_conf}"\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `LIMONS_${currentReportData.title.replace(/[^a-zA-Z0-9]/g, '_')}.csv`;
+      a.click();
+      showToast('CSV Audit file downloaded!');
+    }
+
+    function exportReportJSON() {
+      if (!currentReportData) return;
+      const str = JSON.stringify(currentReportData, null, 2);
+      const blob = new Blob([str], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `LIMONS_Report_Data.json`;
+      a.click();
+      showToast('JSON Intelligence file downloaded!');
+    }
+
+    // ═════════════════════════════════════════════════════════════
+    // EVIDENCE VIDEO VAULT & SNAPSHOT INTELLIGENCE
+    // ═════════════════════════════════════════════════════════════
+    async function loadEvidenceVault() {
+      await Promise.all([loadEvidenceVideos(), loadSnapshotsGallery()]);
+    }
+
+    async function loadEvidenceVideos() {
+      const container = document.getElementById('evidence-video-container');
+      if (!container) return;
+
+      try {
+        const res = await fetch('/api/evidence/list');
+        const data = await res.json();
+        const items = data.evidence || [];
+
+        if (items.length === 0) {
+          container.innerHTML = `
+            <div style="grid-column:1/-1; padding:2rem; text-align:center; color:var(--color-muted); background:var(--color-dark-card); border-radius:var(--radius-md); border:1px dashed var(--color-border);">
+              <span>📹</span> No forensic evidence videos generated yet. Detections will automatically record 5-second MP4 evidence clips here.
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = '';
+        items.forEach(item => {
+          const card = document.createElement('div');
+          card.className = 'evidence-card';
+          const thumbUrl = item.thumbnail_url || '/api/video_feed/primary';
+          const videoUrl = item.video_url || `/api/evidence/video?filename=${encodeURIComponent(item.filename)}`;
+          const dlUrl = `/api/evidence/download?filename=${encodeURIComponent(item.filename)}`;
+          const camLabel = item.camera_id === 'primary' ? 'Camera 01 (Optical HD)' : 'Camera 02 (Thermal FLIR)';
+          const confPct = Math.round((item.confidence || 0.95) * 100);
+          const timeFormatted = new Date(item.timestamp).toLocaleString('en-GB', {
+            day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
+          });
+
+          card.innerHTML = `
+            <div class="evidence-card__thumb" onclick="openVideoLightbox('${videoUrl}', '${item.case_id} &bull; ${camLabel} &bull; Bearing ${item.bearing_deg}°')">
+              <img class="evidence-card__img" src="${thumbUrl}" alt="Evidence Clip Thumbnail" />
+              <div class="evidence-card__play-btn">▶</div>
+              <div class="evidence-card__duration-badge">${item.duration_seconds || 5}s MP4</div>
+            </div>
+            <div class="evidence-card__body">
+              <div class="evidence-card__header">
+                <span class="evidence-card__case-id">📁 ${item.case_id}</span>
+                <span class="meta-pill" style="color:var(--status-ok); font-size:0.65rem;">VERIFIED EVIDENCE</span>
+              </div>
+              <div class="evidence-card__meta-grid">
+                <div>Source: <strong>${item.camera_id ? item.camera_id.toUpperCase() : 'CAM-01'}</strong></div>
+                <div>Confidence: <strong>${confPct}%</strong></div>
+                <div>Bearing: <strong>${item.bearing_deg || 45.0}°</strong></div>
+                <div>Sector: <strong>${item.city || 'Sector Alpha'}</strong></div>
+                <div style="grid-column:1/-1;">Recorded: <strong>${timeFormatted}</strong></div>
+              </div>
+              <div class="evidence-card__actions">
+                <button class="btn-evidence-play" onclick="openVideoLightbox('${videoUrl}', '${item.case_id} &bull; ${camLabel} &bull; Bearing ${item.bearing_deg}°')">
+                  <span>▶</span> Play Evidence Clip
+                </button>
+                <a class="btn-evidence-dl" href="${dlUrl}" download title="Download Forensic MP4 Clip">
+                  <span>📥</span> MP4
+                </a>
+              </div>
+            </div>
+          `;
+          container.appendChild(card);
+        });
+      } catch (err) {
+        console.error('Failed to load evidence videos:', err);
+      }
+    }
+
+    async function loadSnapshotsGallery() {
+      const container = document.getElementById('snapshot-gallery-container');
+      if (!container) return;
+
+      const sampleSnapshots = [
+        { title: 'Quadcopter Incursion #481', time: 'Today 21:28', cam: 'CAM 01 North', alt: '118m' },
+        { title: 'Fixed-Wing Recon UAV #480', time: 'Today 19:45', cam: 'CAM 02 Thermal', alt: '240m' },
+        { title: 'Micro-FPV Perimeter Breach', time: 'Today 18:12', cam: 'CAM 01 North', alt: '85m' },
+        { title: 'Commercial Drone Night Recon', time: 'Yesterday 23:10', cam: 'CAM 02 Thermal', alt: '160m' },
+        { title: 'Tactical UAS Track Alpha', time: 'Yesterday 17:35', cam: 'CAM 01 North', alt: '195m' },
+        { title: 'Multi-Rotor Hover Threat', time: '01 Oct 16:20', cam: 'CAM 02 Thermal', alt: '140m' },
+      ];
+
+      container.innerHTML = '';
+      sampleSnapshots.forEach((snap) => {
+        const card = document.createElement('div');
+        card.className = 'gallery-card';
+        card.innerHTML = `
+          <img class="gallery-card__img" src="/api/video_feed/primary" alt="${snap.title}" />
+          <div class="gallery-card__footer">
+            <span style="font-weight:600; color:var(--color-light);">${snap.title}</span>
+            <span style="color:var(--color-accent); font-family:var(--font-mono); font-size:0.7rem;">${snap.time}</span>
+          </div>
+        `;
+        card.addEventListener('click', () => openLightbox('/api/video_feed/primary', `${snap.title} — ${snap.cam}`));
+        container.appendChild(card);
+      });
+    }
+
+    function openVideoLightbox(videoUrl, caption) {
+      const modal = document.getElementById('lightbox-modal');
+      const img = document.getElementById('lightbox-img');
+      const video = document.getElementById('lightbox-video');
+      const cap = document.getElementById('lightbox-caption');
+
+      if (modal && video) {
+        if (img) img.style.display = 'none';
+        video.style.display = 'block';
+        video.src = videoUrl;
+        video.load();
+        video.play().catch(() => {});
+        if (cap) cap.innerHTML = `🎬 Forensic Evidence Video: <strong>${caption || 'Target Drone Detection'}</strong>`;
+        modal.classList.add('active');
+      }
+    }
+
+    function openLightbox(src, caption) {
+      const modal = document.getElementById('lightbox-modal');
+      const img = document.getElementById('lightbox-img');
+      const video = document.getElementById('lightbox-video');
+      const cap = document.getElementById('lightbox-caption');
+
+      if (modal && img) {
+        if (video) {
+          video.pause();
+          video.style.display = 'none';
+        }
+        img.style.display = 'block';
+        img.src = src;
+        if (cap) cap.innerHTML = `🖼️ Forensic Target Snapshot: <strong>${caption || 'High-Resolution Still'}</strong>`;
+        modal.classList.add('active');
+      }
+    }
+
+    function closeLightbox(e) {
+      const modal = document.getElementById('lightbox-modal');
+      const video = document.getElementById('lightbox-video');
+      if (modal) {
+        if (video) {
+          video.pause();
+          video.src = '';
+        }
+        modal.classList.remove('active');
+      }
+    }
+
+    // ═════════════════════════════════════════════════════════════
+    // RF COMSET (5-UNIT RADIO BROADCAST) LOGIC
+    // ═════════════════════════════════════════════════════════════
+    let rfConfigData = {};
+
+    async function loadRFComsetStatus() {
+      try {
+        const res = await fetch('/api/rf/status');
+        const data = await res.json();
+        if (data.success && data.rf) {
+          rfConfigData = data.rf;
+          renderRFUI(data.rf);
+        }
+      } catch (err) {
+        console.error('Failed to load RF status:', err);
+      }
+    }
+
+    function renderRFUI(rf) {
+      // Inputs
+      if (rf.port) document.getElementById('rf-port').value = rf.port;
+      if (rf.baud_rate) document.getElementById('rf-baud').value = rf.baud_rate;
+      if (rf.frequency_mhz) document.getElementById('rf-freq').value = rf.frequency_mhz;
+      if (rf.channel) document.getElementById('rf-channel').value = rf.channel;
+      if (rf.prerecorded_message) document.getElementById('rf-msg-text').value = rf.prerecorded_message;
+
+      // Status text
+      const st = document.getElementById('rf-status-text');
+      if (st) {
+        st.textContent = `RF Radio Modem Linked (${rf.port} @ ${rf.baud_rate} Baud &bull; ${rf.frequency_mhz} MHz)`;
+      }
+
+      // Units grid
+      const container = document.getElementById('rf-units-container');
+      if (container && rf.units) {
+        container.innerHTML = '';
+        rf.units.forEach(u => {
+          const card = document.createElement('div');
+          card.className = 'rf-unit-card';
+          card.id = `unit-card-${u.id}`;
+          card.innerHTML = `
+            <div class="rf-unit-card__header">
+              <span class="rf-unit-card__id">📡 ${u.id}</span>
+              <span class="rf-unit-card__status">● ${u.status}</span>
+            </div>
+            <div class="rf-unit-card__name">${u.name}</div>
+            <div class="rf-unit-card__callsign">CALLSIGN: ${u.callsign}</div>
+            <div class="rf-unit-card__details">
+              <div>Role: <strong>${u.role || 'Field Tactical Node'}</strong></div>
+              <div>Channel: <strong>CH ${u.channel || 5} (${u.frequency_mhz || 433.050} MHz)</strong></div>
+              <div>Hardware Address: <strong>${u.address || '0x01'}</strong></div>
+            </div>
+            <div class="rf-ack-badge">
+              <span>Delivery ACK:</span>
+              <strong style="color:var(--status-ok);">READY (LINK OK)</strong>
+            </div>
+          `;
+          container.appendChild(card);
+        });
+      }
+    }
+
+    async function saveRFParameters() {
+      const payload = {
+        port: document.getElementById('rf-port').value,
+        baud_rate: parseInt(document.getElementById('rf-baud').value) || 9600,
+        frequency_mhz: parseFloat(document.getElementById('rf-freq').value) || 433.050,
+        channel: parseInt(document.getElementById('rf-channel').value) || 5,
+        prerecorded_message: document.getElementById('rf-msg-text').value.trim()
+      };
+
+      try {
+        const res = await fetch('/api/rf/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('RF Comset parameters saved! Synced to all 5 tactical units.');
+          appendRFLog('CONFIG_SYNC', `RF transmitter reconfigured on ${payload.port}, CH ${payload.channel} (${payload.frequency_mhz} MHz)`);
+          loadRFComsetStatus();
+        } else {
+          showToast(`RF update error: ${data.error}`);
+        }
+      } catch (err) {
+        showToast(`RF update failed: ${err.message}`);
+      }
+    }
+
+    function applyRFPreset(preset) {
+      const presets = {
+        preset1: "TACTICAL ALERT: Hostile aerial drone detected at sector {sector}, bearing {bearing} deg. All 5 units initiate combat air surveillance.",
+        preset2: "CODE RED: Aerial threat confirmed in perimeter airspace. Quick Reaction Force mobilize immediately.",
+        preset3: "AIR DEFENCE WARNING: Unidentified UAS target approaching at high speed. All 5 units take defensive postures."
+      };
+      const text = presets[preset] || presets.preset1;
+      document.getElementById('rf-msg-text').value = text;
+      showToast('Tactical pre-recorded message template loaded!');
+    }
+
+    function speakPreRecordedMessage() {
+      const raw = document.getElementById('rf-msg-text').value || "Tactical Drone Alert";
+      const sample = raw
+        .replace('{sector}', 'North Perimeter Sector Alpha')
+        .replace('{bearing}', '045 degrees')
+        .replace('{time}', new Date().toLocaleTimeString())
+        .replace('{conf}', '96 percent');
+
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(sample);
+        utterance.rate = 1.0;
+        utterance.pitch = 0.95;
+        window.speechSynthesis.speak(utterance);
+        showToast('🔊 Playing Pre-Recorded Tactical Voice Preview via Browser Audio!');
+      } else {
+        showToast('Browser Speech Synthesis not supported on this device.');
+      }
+    }
+
+    async function broadcastRFTest() {
+      const raw = document.getElementById('rf-msg-text').value;
+      showToast('Transmitting alert simultaneously to all 5 RF units...');
+
+      // Highlight 5 units visually
+      document.querySelectorAll('.rf-unit-card').forEach(c => c.classList.add('active-alert'));
+
+      try {
+        const res = await fetch('/api/rf/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: raw })
+        });
+        const data = await res.json();
+
+        setTimeout(() => {
+          document.querySelectorAll('.rf-unit-card').forEach(c => c.classList.remove('active-alert'));
+        }, 3000);
+
+        if (data.success) {
+          const acks = data.deliveries || [];
+          acks.forEach(u => {
+            appendRFLog('ACK_RX', `[${u.unit_id}] ${u.callsign}: Delivery ACK verified (${u.latency_ms}ms)`);
+            const unitCard = document.getElementById(`unit-card-${u.unit_id}`);
+            if (unitCard) {
+              const badge = unitCard.querySelector('.rf-ack-badge');
+              if (badge) badge.innerHTML = `<span>Delivery ACK:</span><strong style="color:var(--status-ok);">ACK ${u.latency_ms}ms</strong>`;
+            }
+          });
+          showToast(`Simultaneous RF Alert Broadcast successfully delivered to all 5 units (${data.delivered_count}/5)!`);
+          speakPreRecordedMessage();
+        }
+      } catch (err) {
+        showToast(`RF Broadcast test failed: ${err.message}`);
+      }
+    }
+
+    function appendRFLog(type, text) {
+      const log = document.getElementById('rf-tx-log');
+      const lastTx = document.getElementById('rf-last-tx-time');
+      const timeStr = new Date().toLocaleTimeString('en-GB');
+      if (lastTx) lastTx.textContent = `Last TX: ${timeStr}`;
+      if (!log) return;
+
+      const item = document.createElement('div');
+      item.className = 'event-item';
+      item.innerHTML = `
+        <span class="event-item__time">${timeStr}</span>
+        <span class="event-badge event-badge--detect">${type}</span>
+        <span class="event-item__text">${text}</span>
+      `;
+      log.prepend(item);
+    }
+
+    // ═════════════════════════════════════════════════════════════
+    // 30-SECOND SIREN ALARM CONTROLLER
+    // ═════════════════════════════════════════════════════════════
+    let sirenTimerInterval = null;
+    let sirenRemainingSec = 0;
+    let audioCtx = null;
+    let sirenOsc = null;
+    let sirenMod = null;
+
+    function startSirenCountdown(seconds = 30) {
+      sirenRemainingSec = seconds;
+      clearInterval(sirenTimerInterval);
+
+      const dial = document.getElementById('siren-dial-ring');
+      const disp = document.getElementById('siren-countdown-display');
+      const bannerTimer = document.getElementById('banner-siren-timer');
+      const statusLabel = document.getElementById('siren-card-status');
+
+      if (dial) dial.classList.add('sounding');
+      if (statusLabel) {
+        statusLabel.textContent = '🔊 ACTIVE SOUNDING';
+        statusLabel.style.color = '#ff4757';
+      }
+
+      const updateUI = () => {
+        if (disp) disp.textContent = `${sirenRemainingSec}s`;
+        if (bannerTimer) bannerTimer.textContent = `${sirenRemainingSec}s`;
+      };
+      updateUI();
+
+      sirenTimerInterval = setInterval(() => {
+        sirenRemainingSec--;
+        if (sirenRemainingSec <= 0) {
+          clearInterval(sirenTimerInterval);
+          if (dial) dial.classList.remove('sounding');
+          if (disp) disp.textContent = '30s';
+          if (statusLabel) {
+            statusLabel.textContent = 'ARMED (STANDBY)';
+            statusLabel.style.color = 'var(--status-ok)';
+          }
+          stopBrowserSirenSound();
+        } else {
+          updateUI();
+        }
+      }, 1000);
+    }
+
+    function playBrowserSirenSound(durationSec = 30) {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        if (!audioCtx) audioCtx = new AudioContext();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+
+        stopBrowserSirenSound();
+
+        // Dual sweep oscillator for authentic military/tactical siren sound
+        sirenOsc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        sirenOsc.type = 'sawtooth';
+        sirenOsc.frequency.setValueAtTime(650, audioCtx.currentTime);
+
+        // LFO frequency modulation (sweep between 600Hz and 1000Hz every 0.8s)
+        sirenMod = audioCtx.createOscillator();
+        const modGain = audioCtx.createGain();
+        sirenMod.frequency.value = 1.25; // 1.25 Hz sweep rate
+        modGain.gain.value = 250;       // Sweep range +/- 250Hz
+
+        sirenMod.connect(sirenOsc.frequency);
+        gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime); // controlled volume
+        gainNode.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + durationSec);
+
+        sirenOsc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        sirenMod.start();
+        sirenOsc.start();
+      } catch (e) {
+        console.warn('Web Audio Siren unavailable:', e);
+      }
+    }
+
+    function stopBrowserSirenSound() {
+      try {
+        if (sirenOsc) {
+          sirenOsc.stop();
+          sirenOsc.disconnect();
+          sirenOsc = null;
+        }
+        if (sirenMod) {
+          sirenMod.stop();
+          sirenMod.disconnect();
+          sirenMod = null;
+        }
+      } catch (e) {}
+    }
+
+    async function testSirenAlarm() {
+      try {
+        startSirenCountdown(30);
+        playBrowserSirenSound(30);
+        showToast('🚨 30-Second Physical Siren Relay Activated!');
+
+        const banner = document.getElementById('incursion-banner');
+        if (banner) banner.classList.add('active');
+
+        await fetch('/api/siren/test', { method: 'POST' });
+      } catch (err) {
+        showToast(`Siren trigger error: ${err.message}`);
+      }
+    }
+
+    async function stopSirenAlarm() {
+      clearInterval(sirenTimerInterval);
+      sirenRemainingSec = 0;
+      stopBrowserSirenSound();
+
+      const dial = document.getElementById('siren-dial-ring');
+      const disp = document.getElementById('siren-countdown-display');
+      const statusLabel = document.getElementById('siren-card-status');
+      if (dial) dial.classList.remove('sounding');
+      if (disp) disp.textContent = '30s';
+      if (statusLabel) {
+        statusLabel.textContent = 'MUTED (STANDBY)';
+        statusLabel.style.color = 'var(--status-ok)';
+      }
+
+      showToast('🔇 Siren Alarm Silenced Immediately.');
+      try {
+        await fetch('/api/siren/stop', { method: 'POST' });
+      } catch (err) {}
+    }
+
+    async function loadSirenStatus() {
+      try {
+        const res = await fetch('/api/siren/status');
+        const data = await res.json();
+        if (data.success && data.siren) {
+          if (data.siren.is_active && data.siren.remaining_seconds > 0) {
+            startSirenCountdown(data.siren.remaining_seconds);
+          }
+        }
+      } catch (err) {}
+    }
+
+    // ═════════════════════════════════════════════════════════════
+    // CAMERA SETUP & IP / GPS CONFIGURATION (camera_int)
+    // ═════════════════════════════════════════════════════════════
+    let activeCameraId = 'primary';
+    let allCamerasData = {};
+
+    async function loadCameraConfig() {
+      try {
+        const res = await fetch('/api/camera/config');
+        const data = await res.json();
+        if (data.success && data.cameras) {
+          allCamerasData = data.cameras;
+          populateCameraForm(activeCameraId);
+        }
+      } catch (err) {
+        console.error('Failed to load camera config:', err);
+      }
+    }
+
+    function switchCamSetup(camId, btn) {
+      activeCameraId = camId;
+      document.querySelectorAll('.cam-tab-btn').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+
+      // Update preview video stream to chosen camera
+      const previewImg = document.getElementById('setup-preview-img');
+      if (previewImg) {
+        previewImg.src = `/api/video_feed/${camId}?t=${Date.now()}`;
+      }
+
+      populateCameraForm(camId);
+    }
+
+    function populateCameraForm(camId) {
+      const cam = allCamerasData[camId] || {};
+      const isCam1 = camId === 'primary';
+
+      document.getElementById('setup-current-cam-label').textContent = isCam1 ? 'Camera 01' : 'Camera 02';
+      const sensorPill = document.getElementById('setup-sensor-pill');
+      if (sensorPill) {
+        sensorPill.textContent = (cam.sensor_type || (isCam1 ? 'optical' : 'thermal')).toUpperCase() + ' SENSOR';
+      }
+
+      // Populate input values
+      document.getElementById('cam-name').value = cam.name || (isCam1 ? 'Camera 01 — North Perimeter' : 'Camera 02 — East Sector (Thermal)');
+      document.getElementById('cam-ip').value = cam.ip || (isCam1 ? '192.168.1.101' : '192.168.1.102');
+      document.getElementById('cam-port').value = cam.port || 554;
+      document.getElementById('cam-mode').value = cam.connection_mode || 'ip_rtsp';
+      document.getElementById('cam-path').value = cam.rtsp_path || (isCam1 ? '/stream1' : '/stream2');
+      document.getElementById('cam-user').value = cam.username || 'admin';
+      document.getElementById('cam-pass').value = cam.password || '';
+      document.getElementById('cam-city').value = cam.city || (isCam1 ? 'Islamabad' : 'Rawalpindi');
+      document.getElementById('cam-lat').value = cam.latitude !== undefined ? cam.latitude : (isCam1 ? 33.6844 : 33.5973);
+      document.getElementById('cam-lon').value = cam.longitude !== undefined ? cam.longitude : 73.0479;
+      document.getElementById('cam-azimuth').value = cam.azimuth_deg !== undefined ? cam.azimuth_deg : (isCam1 ? 45.0 : 128.5);
+      document.getElementById('cam-sensor-type').value = cam.sensor_type || (isCam1 ? 'optical' : 'thermal');
+
+      // Update status badges
+      const statusBadge = document.getElementById('setup-conn-badge');
+      const statusText = document.getElementById('setup-status-text');
+      const isOnline = cam.is_online;
+
+      if (isOnline) {
+        statusBadge.innerHTML = `<span class="status-indicator-tag status-indicator-tag--online"><span class="status-dot"></span> CONNECTED (${cam.latency_ms}ms)</span>`;
+        statusText.textContent = `Live IP Stream Active (${cam.current_fps} FPS)`;
+      } else {
+        statusBadge.innerHTML = `<span class="status-indicator-tag status-indicator-tag--sim"><span class="status-dot status-dot--warn"></span> SIMULATION MODE</span>`;
+        statusText.textContent = `Awaiting Physical IP Link &bull; Tactical Simulation Active`;
+      }
+
+      // Update Telemetry Display
+      updateTelemetryDisplay(cam);
+    }
+
+    function updateTelemetryDisplay(cam) {
+      const city = cam.city || document.getElementById('cam-city').value || 'Station Alpha';
+      const lat = cam.latitude !== undefined ? cam.latitude : (document.getElementById('cam-lat').value || 33.6844);
+      const lon = cam.longitude !== undefined ? cam.longitude : (document.getElementById('cam-lon').value || 73.0479);
+      const az = cam.azimuth_deg !== undefined ? cam.azimuth_deg : (document.getElementById('cam-azimuth').value || 45.0);
+      const ip = cam.ip || document.getElementById('cam-ip').value || '192.168.1.101';
+      const port = cam.port || document.getElementById('cam-port').value || '554';
+      const path = cam.rtsp_path || document.getElementById('cam-path').value || '/stream1';
+
+      document.getElementById('geo-city-val').textContent = city;
+      document.getElementById('geo-coords-val').textContent = `${parseFloat(lat).toFixed(4)}° N, ${parseFloat(lon).toFixed(4)}° E`;
+      document.getElementById('geo-azimuth-val').textContent = `${parseFloat(az).toFixed(1)}° (${getCardinalDirection(az)})`;
+      document.getElementById('geo-rtsp-val').textContent = `rtsp://${ip}:${port}${path}`;
+      document.getElementById('geo-calc-sample').textContent = `${parseFloat(lat).toFixed(4)} N, ${parseFloat(lon).toFixed(4)} E`;
+    }
+
+    function getCardinalDirection(angle) {
+      const dirs = ['North (N)', 'North-East (NE)', 'East (E)', 'South-East (SE)', 'South (S)', 'South-West (SW)', 'West (W)', 'North-West (NW)'];
+      const index = Math.round(((parseFloat(angle) %= 360) < 0 ? angle + 360 : angle) / 45) % 8;
+      return dirs[index];
+    }
+
+    async function testCameraProbe() {
+      const ip = document.getElementById('cam-ip').value.trim();
+      const port = parseInt(document.getElementById('cam-port').value) || 554;
+      const alertBox = document.getElementById('probe-alert');
+      const alertMsg = document.getElementById('probe-alert-msg');
+      const alertIcon = document.getElementById('probe-alert-icon');
+
+      if (!ip) {
+        showToast('Please enter an IP address to test.');
+        return;
+      }
+
+      alertBox.className = 'probe-result-alert show';
+      alertBox.style.background = 'rgba(255, 159, 28, 0.2)';
+      alertBox.style.borderColor = '#ff9f1c';
+      alertBox.style.color = '#ffd166';
+      alertIcon.textContent = '⏳';
+      alertMsg.textContent = `Probing ${ip}:${port} on local network...`;
+
+      try {
+        const res = await fetch('/api/camera/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ip, port })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          alertBox.className = 'probe-result-alert show probe-result-alert--success';
+          alertIcon.textContent = '✅';
+          alertMsg.textContent = `Connection Successful! ${data.message}`;
+          showToast(`Camera reached at ${ip}:${port} (${data.latency_ms}ms)!`);
+        } else {
+          alertBox.className = 'probe-result-alert show probe-result-alert--error';
+          alertIcon.textContent = '⚠️';
+          alertMsg.textContent = `Camera Not Reachable: ${data.message}. (Tactical simulator will remain active until camera is plugged into LAN).`;
+          showToast(`Camera connection test: Offline (${ip}:${port})`);
+        }
+      } catch (err) {
+        alertBox.className = 'probe-result-alert show probe-result-alert--error';
+        alertIcon.textContent = '❌';
+        alertMsg.textContent = `Probe error: ${err.message}`;
+      }
+    }
+
+    async function saveCameraConfiguration() {
+      const payload = {
+        id: activeCameraId,
+        name: document.getElementById('cam-name').value.trim(),
+        ip: document.getElementById('cam-ip').value.trim(),
+        port: parseInt(document.getElementById('cam-port').value) || 554,
+        connection_mode: document.getElementById('cam-mode').value,
+        rtsp_path: document.getElementById('cam-path').value.trim(),
+        username: document.getElementById('cam-user').value.trim(),
+        password: document.getElementById('cam-pass').value.trim(),
+        city: document.getElementById('cam-city').value.trim(),
+        latitude: parseFloat(document.getElementById('cam-lat').value) || 33.6844,
+        longitude: parseFloat(document.getElementById('cam-lon').value) || 73.0479,
+        azimuth_deg: parseFloat(document.getElementById('cam-azimuth').value) || 45.0,
+        sensor_type: document.getElementById('cam-sensor-type').value,
+        enabled: true
+      };
+
+      try {
+        const res = await fetch('/api/camera/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          allCamerasData[activeCameraId] = payload;
+          updateTelemetryDisplay(payload);
+          showToast(`Configuration saved for ${payload.name}! Live stream reloaded.`);
+
+          // Refresh live feed preview
+          const previewImg = document.getElementById('setup-preview-img');
+          if (previewImg) {
+            previewImg.src = `/api/video_feed/${activeCameraId}?t=${Date.now()}`;
+          }
+
+          // Also reload main feed image if on live tab
+          const mainFeed = document.querySelector(activeCameraId === 'primary' ? '#cam-card-1 img' : '#cam-card-2 img');
+          if (mainFeed) {
+            mainFeed.src = `/api/video_feed/${activeCameraId}?t=${Date.now()}`;
+          }
+        } else {
+          showToast(`Save failed: ${data.error}`);
+        }
+      } catch (err) {
+        showToast(`Save failed: ${err.message}`);
+      }
+    }
+
+    function autoDetectLocation() {
+      if (!navigator.geolocation) {
+        showToast('Geolocation is not supported by this browser.');
+        return;
+      }
+      showToast('Detecting GPS location from browser...');
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude.toFixed(6);
+          const lon = pos.coords.longitude.toFixed(6);
+          document.getElementById('cam-lat').value = lat;
+          document.getElementById('cam-lon').value = lon;
+          updateTelemetryDisplay({ latitude: lat, longitude: lon });
+          showToast(`Detected GPS: ${lat}° N, ${lon}° E`);
+        },
+        (err) => {
+          showToast(`Location error: ${err.message}. Using default coordinates.`);
+        },
+        { timeout: 8000 }
+      );
+    }
+
+    // Initial load on startup
+    window.addEventListener('DOMContentLoaded', () => {
+      generateReport();
+      loadCameraConfig();
+      loadRFComsetStatus();
+      loadSirenStatus();
+      loadEvidenceVault();
+    });
+  </script>
+</body>
+</html>

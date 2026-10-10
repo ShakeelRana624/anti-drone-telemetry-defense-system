@@ -1,0 +1,31 @@
+# dataset.yaml — YOLO11m Drone Detection Training Dataset
+# Place your images and labels under the paths specified below.
+#
+# Directory structure expected:
+#   data/
+#   ├── images/
+#   │   ├── train/     ← training images (.jpg / .png)
+#   │   ├── val/       ← validation images
+#   │   └── test/      ← optional test set
+#   └── labels/
+#       ├── train/     ← YOLO-format .txt label files
+#       ├── val/
+#       └── test/
+#
+# Label format per line: <class_id> <cx> <cy> <w> <h>  (all normalised 0-1)
+
+path: data          # dataset root (relative to project root)
+
+train: images/train
+val:   images/val
+test:  images/test  # optional
+
+# ─────────────────────────────────────────
+# Classes
+# ─────────────────────────────────────────
+nc: 3               # number of classes
+
+names:
+  0: drone           # generic multirotor / quadcopter
+  1: fixed-wing-uav  # fixed-wing UAV
+  2: helicopter      # manned/unmanned helicopter

@@ -1,0 +1,168 @@
+# config.yaml — AI-Based Autonomous Drone Detection & Early Warning System
+# Military-Grade Configuration — All parameters in one place.
+# DO NOT commit this file with real phone numbers / serial ports to version control.
+
+# ─────────────────────────────────────────────────────────────────
+# Detection — YOLO11m inference
+# ─────────────────────────────────────────────────────────────────
+detection:
+  # Custom trained model (user trained model in model/ folder)
+  model_path:      "model/best.onnx"
+  fallback_model:  "yolo11m.pt"             # Ultralytics pretrained YOLO11m
+
+  confidence_threshold: 0.40               # Lower = more sensitive (tune post-training)
+  iou_threshold:        0.45               # NMS IoU
+  device:               "cpu"              # "cuda" | "cpu" | "0"
+  imgsz:                640                # Input image size for ONNX model
+
+  # Drone class IDs in your custom model (0: drone)
+  drone_classes: [0]
+
+  # ── SAHI (Slicing Aided Hyper Inference) ────────────────────
+  # Dramatically improves small/distant drone detection by slicing
+  # each frame into overlapping tiles and merging results.
+  sahi:
+    enabled:          true
+    slice_height:     512                  # Tile height in pixels
+    slice_width:      512                  # Tile width in pixels
+    overlap_ratio:    0.20                 # Tile overlap (0–1)
+    postprocess_type: "NMS"               # "NMS" | "GREEDYNMM"
+    postprocess_match_threshold: 0.50
+
+  # ── TTA (Test-Time Augmentation) ────────────────────────────
+  # Runs inference on augmented versions of each frame and merges.
+  # Small accuracy gain at ~2× inference cost. Disable if latency critical.
+  tta:
+    enabled: true
+
+# ─────────────────────────────────────────────────────────────────
+# Tracker — DeepSORT
+# ─────────────────────────────────────────────────────────────────
+tracker:
+  # Minimum consecutive frame hits before a track is "confirmed"
+  confirmation_frames:   5
+  # Maximum frames a track can go unmatched before deletion
+  max_age:               30
+  # Minimum IoU to associate a detection with an existing track
+  n_init:                3                 # DeepSORT internal init frames
+  max_cosine_distance:   0.40              # Re-ID appearance distance threshold
+  nn_budget:             100              # Max appearance descriptors per track
+
+  # Cross-camera spatial validation window (seconds)
+  cross_camera_check:    true
+  cross_camera_window_s: 2.0
+
+# ─────────────────────────────────────────────────────────────────
+# Cameras
+# ─────────────────────────────────────────────────────────────────
+cameras:
+  primary:
+    source: 0                              # Device index or RTSP URL
+    fps: 25
+    resolution: [1280, 720]
+    label: "Camera 1 — Primary"
+
+  secondary:
+    source: 1
+    fps: 25
+    resolution: [1280, 720]
+    label: "Camera 2 — Secondary"
+
+# ─────────────────────────────────────────────────────────────────
+# Alerting
+# ─────────────────────────────────────────────────────────────────
+alerting:
+  cooldown_seconds: 45                     # Min gap between alert bursts per camera
+
+  siren:
+    enabled: true
+    gpio_pin: 17                           # BCM GPIO (Raspberry Pi / Jetson)
+    duration_seconds: 30                   # Siren alert duration (30 seconds)
+
+  gsm_sms:
+    enabled: true
+    port: "/dev/ttyUSB0"
+    baud_rate: 9600
+    recipients:
+      - "+92300XXXXXXX"
+      - "+92310XXXXXXX"
+    message_template: "DRONE ALERT [{timestamp}] Cam:{camera_id} Bearing:{bearing}deg Count:{count}"
+
+  landline:
+    enabled: false
+    port: "/dev/ttyS0"
+    dial_number: "0911"
+    message: "Drone detected. Immediate response required."
+
+  rf_comset:
+    enabled: true
+    port: "/dev/ttyUSB1"
+    baud_rate: 115200
+    channel: 5
+    frequency_mhz: 433.050
+    prerecorded_message: "TACTICAL DRONE INTRUSION DETECTED AT {camera_id}. BEARING {bearing} DEGREES. DEPLOY AIR DEFENSE RESPONSE IMMEDIATELY."
+    units:
+      - id: "RF-01"
+        name: "Perimeter Guard Post Alpha"
+        callsign: "VANGUARD-1"
+        address: "0x01"
+        status: "ACTIVE"
+      - id: "RF-02"
+        name: "Quick Reaction Force (QRF)"
+        callsign: "STRIKER-2"
+        address: "0x02"
+        status: "ACTIVE"
+      - id: "RF-03"
+        name: "Tactical Operations Command"
+        callsign: "OVERLORD-HQ"
+        address: "0x03"
+        status: "ACTIVE"
+      - id: "RF-04"
+        name: "Air Defense & Interceptor Post"
+        callsign: "SHIELD-4"
+        address: "0x04"
+        status: "ACTIVE"
+      - id: "RF-05"
+        name: "Mobile Patrol Rover Team"
+        callsign: "HAWK-5"
+        address: "0x05"
+        status: "ACTIVE"
+
+# ─────────────────────────────────────────────────────────────────
+# Logging
+# ─────────────────────────────────────────────────────────────────
+logging:
+  level: "INFO"
+  event_log_dir: "logs/events"
+  snapshot_dir:  "logs/snapshots"
+  max_log_days:  30
+  event_ring_buffer_size: 200
+
+# ─────────────────────────────────────────────────────────────────
+# Dashboard
+# ─────────────────────────────────────────────────────────────────
+dashboard:
+  host: "0.0.0.0"
+  port: 5000
+  debug: false
+  secret_key: "drone-watch-2026-change-me-in-production"
+  max_snapshots_in_gallery: 20
+
+# ─────────────────────────────────────────────────────────────────
+# Bearing estimation
+# ─────────────────────────────────────────────────────────────────
+bearing:
+  camera_fov_horizontal: 90
+  camera_fov_vertical:   60
+  frame_width:  1280
+  frame_height: 720
+
+# ─────────────────────────────────────────────────────────────────
+# System health monitor
+# ─────────────────────────────────────────────────────────────────
+system_health:
+  check_interval_seconds:       30
+  cpu_threshold_percent:        85
+  memory_threshold_percent:     80
+  disk_threshold_percent:       90
+  temperature_threshold_celsius: 75

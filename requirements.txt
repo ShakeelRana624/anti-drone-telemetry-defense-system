@@ -1,0 +1,40 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# requirements.txt — AI Drone Detection & Early Warning System
+# Military-Grade | YOLO11m + SAHI + TTA + DeepSORT
+#
+# Install:  pip install -r requirements.txt
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Core AI / Detection ───────────────────────────────────────────────────────
+ultralytics>=8.3.0          # YOLO11m inference, training, TTA (augment=True)
+torch>=2.2.0                # PyTorch backend (CUDA or CPU)
+torchvision>=0.17.0
+numpy>=1.26.0
+opencv-python>=4.9.0        # Camera capture, frame I/O, annotation
+
+# ── SAHI — Slicing Aided Hyper Inference ─────────────────────────────────────
+# Dramatically improves small/distant drone detection via tiled inference
+sahi>=0.11.18
+
+# ── DeepSORT — Multi-Object Tracking ─────────────────────────────────────────
+# Appearance-based re-ID + Kalman filter for temporal drone confirmation
+deep-sort-realtime>=1.3.2
+
+# ── Dashboard ─────────────────────────────────────────────────────────────────
+flask>=3.0.0
+flask-cors>=4.0.0           # CORS for API (optional, remove if not needed)
+
+# ── Serial communication (GSM, landline, RF comset) ───────────────────────────
+pyserial>=3.5
+
+# ── System health ─────────────────────────────────────────────────────────────
+psutil>=5.9.0
+
+# ── Configuration ─────────────────────────────────────────────────────────────
+pyyaml>=6.0
+
+# ── GPIO (Raspberry Pi / Jetson only — uncomment on target hardware) ──────────
+# RPi.GPIO>=0.7.1
+
+# ── Optional: TTS for landline voice alerts ───────────────────────────────────
+# pyttsx3>=2.90

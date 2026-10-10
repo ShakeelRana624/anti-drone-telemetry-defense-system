@@ -1,0 +1,66 @@
+# ==============================================================================
+# .gitignore — Anti-Drone Telemetry & Defense System
+# ==============================================================================
+
+# Byte-compiled / optimized / Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+*.pyo
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Heavy Machine Learning Weights & Models (Keep repo light)
+*.pt
+*.onnx
+*.engine
+*.tflite
+model/*.onnx
+model/*.pt
+yolo11n.pt
+yolo11n.onnx
+
+# Large Media & Video Datasets
+*.avi
+*.mov
+*.mkv
+test_videos/*
+!test_videos/.gitkeep
+logs/evidence_videos/*
+!logs/evidence_videos/.gitkeep
+
+# Output videos (whitelist demo video and preview assets)
+output_videos/*
+!output_videos/.gitkeep
+!output_videos/input_detected 1.mp4
+!output_videos/demo.gif
+!output_videos/*.jpg
+
+# Logs & Evidence Snapshots
+logs/*.log
+logs/snapshots/*
+!logs/snapshots/.gitkeep
+logs/events/*
+!logs/events/.gitkeep
+*.log
+
+# Sensitive Credentials & Local Environment Files
+.env
+.env.*
+config/secrets.yaml
+
+# OS & Editor Specific Files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace

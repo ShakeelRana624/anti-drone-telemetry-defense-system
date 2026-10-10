@@ -1,0 +1,317 @@
+"""
+ip_stream.py — Robust IP Camera Stream Handler
+================================================
+Handles real-time RTSP, HTTP (MJPEG/H.264), and device video streaming.
+Features:
+  - Background double-buffered capture thread
+  - TCP transport option for stable RTSP over LAN/WAN
+  - Automatic reconnection logic
+  - Connection probing for non-technical setup validation
+  - Synthetic tactical HUD fallback with live GPS watermark when camera is offline
+"""
+
+from __future__ import annotations
+
+import logging
+import math
+import os
+import socket
+import threading
+import time
+from datetime import datetime
+from typing import Any, Dict, Optional, Tuple
+
+import cv2
+import numpy as np
+
+logger = logging.getLogger(__name__)
+
+# Force TCP transport for RTSP in OpenCV ffmpeg backend
+os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
+
+
+def probe_ip_camera(
+    ip: str,
+    port: int = 554,
+    timeout_sec: float = 2.0
+) -> Tuple[bool, str, float]:
+    """
+    Test if an IP address and port are reachable on the network.
+    Returns (success, message, latency_ms).
+    """
+    if not ip or ip.strip() in ["", "0.0.0.0", "localhost"]:
+        return False, "Invalid or empty IP address provided.", 0.0
+
+    t_start = time.perf_counter()
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout_sec)
+        result = sock.connect_ex((ip.strip(), int(port)))
+        sock.close()
+        elapsed_ms = round((time.perf_counter() - t_start) * 1000, 1)
+
+        if result == 0:
+            return True, f"Host reachable at {ip}:{port} (Response time: {elapsed_ms}ms)", elapsed_ms
+        else:
+            return False, f"Cannot connect to {ip}:{port} (Port closed or host unreachable). Error code: {result}", elapsed_ms
+    except Exception as exc:
+        return False, f"Network probe failed: {exc}", 0.0
+
+
+class IPCameraStream:
+    """
+    Background worker thread reading frames from an IP (RTSP/HTTP) source.
+    """
+
+    def __init__(self, config: Dict[str, Any]) -> None:
+        self.camera_id = config.get("id", "camera")
+        self.config = config
+        self.source = self._resolve_source(config)
+        self.target_fps = config.get("fps", 25)
+        self.resolution = tuple(config.get("resolution", [1280, 720]))
+        self.sensor_type = config.get("sensor_type", "optical")
+
+        # Telemetry info
+        self.city = config.get("city", "Station Alpha")
+        self.latitude = float(config.get("latitude", 33.6844))
+        self.longitude = float(config.get("longitude", 73.0479))
+        self.azimuth_deg = float(config.get("azimuth_deg", 45.0))
+
+        self._cap: Optional[cv2.VideoCapture] = None
+        self._frame: Optional[np.ndarray] = None
+        self._lock = threading.Lock()
+        self._thread: Optional[threading.Thread] = None
+        self._running = False
+        self.healthy = False
+        self.latency_ms = 12.0
+        self.current_fps = 0.0
+        self._frame_count = 0
+        self._synthetic_idx = 0
+
+    def _resolve_source(self, cfg: Dict[str, Any]) -> Any:
+        mode = cfg.get("connection_mode", "ip_rtsp")
+        custom = (cfg.get("custom_url") or "").strip()
+        if custom:
+            return custom
+
+        if mode == "usb":
+            try:
+                return int(cfg.get("ip", 0))
+            except ValueError:
+                return 0
+
+        ip = (cfg.get("ip") or "").strip()
+        port = cfg.get("port", 554)
+        user = (cfg.get("username") or "").strip()
+        pwd = (cfg.get("password") or "").strip()
+        path = (cfg.get("rtsp_path") or "").strip()
+        if path and not path.startswith("/"):
+            path = "/" + path
+
+        auth = f"{user}:{pwd}@" if user and pwd else (f"{user}@" if user else "")
+        if mode == "ip_http":
+            return f"http://{auth}{ip}:{port}{path}"
+        return f"rtsp://{auth}{ip}:{port}{path}"
+
+    def start(self) -> None:
+        self._running = True
+        self._thread = threading.Thread(
+            target=self._worker_loop,
+            daemon=True,
+            name=f"ip-cam-{self.camera_id}"
+        )
+        self._thread.start()
+        logger.info("IPCameraStream [%s] initialized with source: %s", self.camera_id, self.source)
+
+    def stop(self) -> None:
+        self._running = False
+        if self._thread:
+            self._thread.join(timeout=3)
+        if self._cap:
+            try:
+                self._cap.release()
+            except Exception:
+                pass
+        self._cap = None
+        logger.info("IPCameraStream [%s] stopped.", self.camera_id)
+
+    def update_config(self, new_config: Dict[str, Any]) -> None:
+        """Dynamically update config and re-initialize stream if source changed."""
+        self.config.update(new_config)
+        self.city = new_config.get("city", self.city)
+        self.latitude = float(new_config.get("latitude", self.latitude))
+        self.longitude = float(new_config.get("longitude", self.longitude))
+        self.azimuth_deg = float(new_config.get("azimuth_deg", self.azimuth_deg))
+        new_source = self._resolve_source(self.config)
+
+        if new_source != self.source:
+            logger.info("IP Camera [%s] source changed to: %s. Reconnecting...", self.camera_id, new_source)
+            self.source = new_source
+            if self._cap:
+                try:
+                    self._cap.release()
+                except Exception:
+                    pass
+                self._cap = None
+            self.healthy = False
+
+    def read(self) -> np.ndarray:
+        """Return latest frame; falls back to tactical synthetic frame if physical camera is offline."""
+        with self._lock:
+            if self._frame is not None:
+                return self._frame.copy()
+
+        # Fallback to high-definition simulated tactical frame with real GPS watermark
+        self._synthetic_idx += 1
+        return self._render_synthetic_tactical_frame(self._synthetic_idx)
+
+    def _worker_loop(self) -> None:
+        interval = 1.0 / max(1, self.target_fps)
+        reconnect_delay = 5.0
+        last_reconnect_attempt = 0.0
+
+        fps_timer = time.time()
+        fps_counter = 0
+
+        while self._running:
+            now = time.time()
+
+            # Attempt capture if available
+            if self._cap is None:
+                if now - last_reconnect_attempt > reconnect_delay:
+                    last_reconnect_attempt = now
+                    try:
+                        # Fast probe to prevent OpenCV 30-second network hang on unreachable IP
+                        cam_ip = self.config.get("ip", "").strip()
+                        cam_port = int(self.config.get("port", 554))
+                        is_usb = self.config.get("connection_mode") == "usb"
+                        is_reachable = True
+
+                        if not is_usb and cam_ip:
+                            is_reachable, _, _ = probe_ip_camera(cam_ip, cam_port, timeout_sec=0.8)
+
+                        if is_reachable:
+                            t0 = time.perf_counter()
+                            cap = cv2.VideoCapture(self.source)
+                            if cap.isOpened():
+                                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                                self._cap = cap
+                                self.healthy = True
+                                self.latency_ms = round((time.perf_counter() - t0) * 1000, 1)
+                                logger.info("Connected to camera stream [%s]: %s", self.camera_id, self.source)
+                            else:
+                                self.healthy = False
+                        else:
+                            self.healthy = False
+                    except Exception as err:
+                        self.healthy = False
+                        self._cap = None
+            else:
+                # Read physical frame
+                try:
+                    ret, frame = self._cap.read()
+                    if ret and frame is not None:
+                        self.healthy = True
+                        fps_counter += 1
+                        with self._lock:
+                            self._frame = frame
+                    else:
+                        self.healthy = False
+                        self._cap.release()
+                        self._cap = None
+                        last_reconnect_attempt = now
+                except Exception:
+                    self.healthy = False
+                    self._cap = None
+
+            # Calculate actual FPS
+            if now - fps_timer >= 1.0:
+                self.current_fps = fps_counter / (now - fps_timer)
+                fps_counter = 0
+                fps_timer = now
+
+            time.sleep(interval)
+
+    def _render_synthetic_tactical_frame(self, frame_idx: int) -> np.ndarray:
+        """Render high-aesthetic tactical stream with live GPS & sensor telemetry."""
+        w, h = 640, 360
+        is_thermal = self.sensor_type == "thermal"
+
+        if is_thermal:
+            img = np.zeros((h, w, 3), dtype=np.uint8)
+            img[:, :] = (18, 12, 28)  # Deep wine thermal base
+            noise = np.random.randint(0, 14, (h, w, 3), dtype=np.uint8)
+            img = cv2.add(img, noise)
+        else:
+            img = np.zeros((h, w, 3), dtype=np.uint8)
+            img[:, :] = (15, 10, 24)
+            noise = np.random.randint(0, 10, (h, w, 3), dtype=np.uint8)
+            img = cv2.add(img, noise)
+
+        grid_color = (40, 25, 60)
+        for x in range(40, w, 80):
+            cv2.line(img, (x, 0), (x, h), grid_color, 1)
+        for y in range(30, h, 60):
+            cv2.line(img, (0, y), (w, y), grid_color, 1)
+
+        # Crosshair & reticle
+        cx, cy = w // 2, h // 2
+        accent_bgr = (173, 165, 243)
+        crimson_bgr = (35, 30, 154)
+
+        cv2.circle(img, (cx, cy), 45, grid_color, 1)
+        cv2.circle(img, (cx, cy), 4, accent_bgr, -1)
+        cv2.line(img, (cx - 20, cy), (cx - 8, cy), accent_bgr, 1)
+        cv2.line(img, (cx + 8, cy), (cx + 20, cy), accent_bgr, 1)
+        cv2.line(img, (cx, cy - 20), (cx, cy - 8), accent_bgr, 1)
+        cv2.line(img, (cx, cy + 8), (cx, cy + 20), accent_bgr, 1)
+
+        # Smooth target simulation
+        t = frame_idx * 0.04
+        if not is_thermal:
+            dx = int(cx + 120 * math.sin(t) + 30 * math.cos(2 * t))
+            dy = int(cy - 40 + 50 * math.cos(t * 1.3))
+            label = "TARGET #01 [QUADCOPTER]"
+            conf = "96.8%"
+        else:
+            dx = int(cx - 100 * math.cos(t * 0.8) + 20 * math.sin(t))
+            dy = int(cy + 20 + 40 * math.sin(t * 1.1))
+            label = "THERMAL FLIR TARGET #02"
+            conf = "94.2%"
+
+        # Bounding box brackets
+        bw, bh = 76, 52
+        bx1, by1 = max(10, dx - bw // 2), max(10, dy - bh // 2)
+        bx2, by2 = min(w - 10, bx1 + bw), min(h - 10, by1 + bh)
+        k = 12
+        cv2.line(img, (bx1, by1), (bx1 + k, by1), accent_bgr, 2)
+        cv2.line(img, (bx1, by1), (bx1, by1 + k), accent_bgr, 2)
+        cv2.line(img, (bx2, by1), (bx2 - k, by1), accent_bgr, 2)
+        cv2.line(img, (bx2, by1), (bx2, by1 + k), accent_bgr, 2)
+        cv2.line(img, (bx1, by2), (bx1 + k, by2), accent_bgr, 2)
+        cv2.line(img, (bx1, by2), (bx1, by2 - k), accent_bgr, 2)
+        cv2.line(img, (bx2, by2), (bx2 - k, by2), accent_bgr, 2)
+        cv2.line(img, (bx2, by2), (bx2 - k, by2), accent_bgr, 2)
+
+        # Target label
+        cv2.rectangle(img, (bx1, by1 - 18), (bx1 + 160, by1), (20, 10, 40), -1)
+        cv2.putText(img, label, (bx1 + 4, by1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.34, accent_bgr, 1, cv2.LINE_AA)
+        cv2.putText(img, f"CONF: {conf} | BRG: {self.azimuth_deg:.1f}°", (bx1, by2 + 14), cv2.FONT_HERSHEY_SIMPLEX, 0.32, (200, 200, 240), 1, cv2.LINE_AA)
+
+        # Top Bar: Camera Label & Status
+        status_text = "LIVE [IP CONNECTED]" if self.healthy else "STANDBY [SIMULATOR MODE]"
+        cam_label = self.config.get("name", self.camera_id).upper()
+        cv2.putText(img, f"{status_text}  {cam_label}", (14, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (241, 244, 247), 1, cv2.LINE_AA)
+
+        # Blinking REC dot
+        if (frame_idx // 10) % 2 == 0:
+            cv2.circle(img, (w - 24, 20), 5, (35, 30, 230), -1)
+
+        # Bottom Bar: GPS Geolocation Telemetry
+        gps_text = f"GPS: {self.latitude:.4f} N, {self.longitude:.4f} E | {self.city.upper()} | AZ: {self.azimuth_deg:.1f}°"
+        cv2.putText(img, gps_text, (14, h - 14), cv2.FONT_HERSHEY_SIMPLEX, 0.34, accent_bgr, 1, cv2.LINE_AA)
+
+        time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cv2.putText(img, time_str, (w - 170, h - 14), cv2.FONT_HERSHEY_SIMPLEX, 0.34, (200, 200, 220), 1, cv2.LINE_AA)
+
+        return img
