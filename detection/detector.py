@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 class Detection:
     """Single object detection result."""
 
-    __slots__ = ("bbox", "confidence", "class_id", "class_name", "track_id")
+    __slots__ = ("bbox", "confidence", "class_id", "class_name", "track_id", "is_coasted")
 
     def __init__(
         self,
@@ -51,12 +51,14 @@ class Detection:
         class_id: int,
         class_name: str,
         track_id: Optional[int] = None,
+        is_coasted: bool = False,
     ) -> None:
         self.bbox       = bbox
         self.confidence = confidence
         self.class_id   = class_id
         self.class_name = class_name
         self.track_id   = track_id
+        self.is_coasted = is_coasted
 
     @property
     def center(self) -> tuple[float, float]:

@@ -28,6 +28,8 @@ from typing import Any, Deque, Dict, List, Optional, Tuple
 
 import numpy as np
 
+from detection.detector import Detection
+
 logger = logging.getLogger(__name__)
 
 
@@ -37,31 +39,27 @@ logger = logging.getLogger(__name__)
 
 class DeepSORTTracker:
     """
-    Wraps deep_sort_realtime.DeepSort with a confirmation gate.
+    Wraps deep_sort_realtime.DeepSort with a high-speed motion gate and Kalman coasting.
 
-    A track is "confirmed" only after it has been continuously matched
-    for `confirmation_frames` consecutive frames.
-
-    Config keys (under 'tracker'):
-        confirmation_frames    (int)   : frames before alert fires       [5]
-        max_age                (int)   : frames before lost track pruned [30]
-        n_init                 (int)   : DeepSORT internal init frames   [3]
-        max_cosine_distance    (float) : Re-ID distance threshold        [0.40]
-        nn_budget              (int)   : appearance descriptor budget    [100]
-        cross_camera_check     (bool)  : enable cross-camera validation  [True]
-        cross_camera_window_s  (float) : time window for cross-cam check [2.0]
+    Features:
+      • Kalman filter motion prediction & coasting (prevents tracking loss during fast drone maneuvers)
+      • Generous IoU & adaptive distance matching (handles abrupt speed boosts)
+      • Multi-frame persistent track confirmation
+      • Cross-camera spatial validation
     """
 
     def __init__(self, config: dict) -> None:
         cfg = config.get("tracker", {})
-        self._confirm_n:   int   = cfg.get("confirmation_frames",   5)
-        self._max_age:     int   = cfg.get("max_age",               30)
-        self._n_init:      int   = cfg.get("n_init",                3)
-        self._cos_dist:    float = cfg.get("max_cosine_distance",   0.40)
-        self._nn_budget:   int   = cfg.get("nn_budget",             100)
-        self._cross_cam:   bool  = cfg.get("cross_camera_check",    True)
-        self._cross_win:   float = cfg.get("cross_camera_window_s", 2.0)
-        self._embedder:    Optional[str] = cfg.get("embedder", None)
+        self._confirm_n:    int   = cfg.get("confirmation_frames",   2)
+        self._max_age:      int   = cfg.get("max_age",               30)
+        self._n_init:       int   = cfg.get("n_init",                2)
+        self._cos_dist:     float = cfg.get("max_cosine_distance",   0.40)
+        self._max_iou_dist: float = cfg.get("max_iou_distance",      0.90)
+        self._max_coast:    int   = cfg.get("max_coast_frames",      5)
+        self._nn_budget:    int   = cfg.get("nn_budget",             100)
+        self._cross_cam:    bool  = cfg.get("cross_camera_check",    True)
+        self._cross_win:    float = cfg.get("cross_camera_window_s", 2.0)
+        self._embedder:     Optional[str] = cfg.get("embedder", None)
 
         # camera_id → DeepSort instance
         self._sorters: Dict[str, Any] = {}
@@ -79,16 +77,14 @@ class DeepSORTTracker:
 
     def update(
         self,
-        detections,                       # List[Detection]
+        detections: List[Detection],
         camera_id: str,
         frame_shape: Tuple[int, int] = (720, 1280),
         frame: Optional[np.ndarray] = None,
-    ) -> List:                            # returns confirmed Detection list
+    ) -> List[Detection]:
         """
         Feed raw detections into DeepSORT for this camera.
-        Returns only detections whose track has been confirmed
-        for `confirmation_frames` consecutive frames AND passes
-        the cross-camera check (if enabled).
+        Returns confirmed and Kalman-coasted detections so high-speed tracking never breaks.
         """
         h, w = frame_shape
 
@@ -112,7 +108,10 @@ class DeepSORTTracker:
         ]
 
         if self._embedder is None:
-            embeds = (np.ones((len(ds_input), 128), dtype=np.float32) / np.sqrt(128.0)).astype(np.float32)
+            if ds_input:
+                embeds = (np.ones((len(ds_input), 128), dtype=np.float32) / np.sqrt(128.0)).astype(np.float32)
+            else:
+                embeds = np.zeros((0, 128), dtype=np.float32)
             tracks = sorter.update_tracks(ds_input, embeds=embeds)
         else:
             if frame is None:
@@ -121,37 +120,74 @@ class DeepSORTTracker:
 
         hit_map = self._hit_counts[camera_id]
         active_ids = set()
-        confirmed_detections: List = []
+        confirmed_detections: List[Detection] = []
 
         for track in tracks:
             if not track.is_confirmed():
                 continue
+
             tid = track.track_id
-            active_ids.add(tid)
-            hit_map[tid] = hit_map.get(tid, 0) + 1
+            tsu = getattr(track, "time_since_update", 0)
 
-            if hit_map[tid] < self._confirm_n:
-                continue  # not yet confirmed by our gate
+            # ── 1. Target detected in current frame ───────────────────
+            if tsu == 0:
+                active_ids.add(tid)
+                hit_map[tid] = hit_map.get(tid, 0) + 1
 
-            # Retrieve Detection object that matched this track
-            matched_det = self._match_track_to_detection(track, detections, w, h)
-            if matched_det is None:
-                continue
+                matched_det = self._match_track_to_detection(track, detections, w, h)
+                if matched_det is not None:
+                    matched_det.track_id = tid
+                    if self._cross_cam:
+                        if not self._cross_camera_ok(matched_det.bbox, camera_id, now):
+                            if hit_map[tid] < self._confirm_n:
+                                continue
+                    confirmed_detections.append(matched_det)
+                else:
+                    # Fallback to track Kalman box if slight threshold offset
+                    ltrb = track.to_ltrb()
+                    norm_bbox = [
+                        max(0.0, min(1.0, float(ltrb[0] / w))),
+                        max(0.0, min(1.0, float(ltrb[1] / h))),
+                        max(0.0, min(1.0, float(ltrb[2] / w))),
+                        max(0.0, min(1.0, float(ltrb[3] / h))),
+                    ]
+                    if norm_bbox[2] > norm_bbox[0] and norm_bbox[3] > norm_bbox[1]:
+                        coasted_det = Detection(
+                            bbox=norm_bbox,
+                            confidence=float(getattr(track, "det_conf", 0.60) or 0.60),
+                            class_id=0,
+                            class_name=getattr(track, "det_class", "drone") or "drone",
+                            track_id=tid,
+                            is_coasted=False,
+                        )
+                        confirmed_detections.append(coasted_det)
 
-            # Cross-camera check
-            if self._cross_cam:
-                if not self._cross_camera_ok(matched_det.bbox, camera_id, now):
-                    if hit_map[tid] < self._confirm_n * 2:
-                        # Require 2× confirmation if no cross-cam corroboration
-                        continue
+            # ── 2. Kalman Coasting (Drone sped up or blurred for 1-5 frames) ──
+            elif 0 < tsu <= self._max_coast:
+                active_ids.add(tid)
+                ltrb = track.to_ltrb()
+                norm_bbox = [
+                    max(0.0, min(1.0, float(ltrb[0] / w))),
+                    max(0.0, min(1.0, float(ltrb[1] / h))),
+                    max(0.0, min(1.0, float(ltrb[2] / w))),
+                    max(0.0, min(1.0, float(ltrb[3] / h))),
+                ]
+                if norm_bbox[2] > norm_bbox[0] and norm_bbox[3] > norm_bbox[1]:
+                    coasted_det = Detection(
+                        bbox=norm_bbox,
+                        confidence=float(getattr(track, "det_conf", 0.55) or 0.55),
+                        class_id=0,
+                        class_name=getattr(track, "det_class", "drone") or "drone",
+                        track_id=tid,
+                        is_coasted=True,
+                    )
+                    confirmed_detections.append(coasted_det)
 
-            matched_det.track_id = tid
-            confirmed_detections.append(matched_det)
-
-        # Prune dead track hit counts
-        dead_ids = set(hit_map.keys()) - active_ids
+        # Prune dead track hit counts ONLY when completely deleted by DeepSort
+        live_track_ids = {t.track_id for t in tracks if not t.is_deleted()}
+        dead_ids = set(hit_map.keys()) - live_track_ids
         for tid in dead_ids:
-            del hit_map[tid]
+            hit_map.pop(tid, None)
 
         return confirmed_detections
 
@@ -185,33 +221,52 @@ class DeepSORTTracker:
                 max_age=self._max_age,
                 n_init=self._n_init,
                 max_cosine_distance=self._cos_dist,
+                max_iou_distance=self._max_iou_dist,
                 nn_budget=self._nn_budget,
                 embedder=self._embedder,
             )
-            logger.info("DeepSORT instance created for camera '%s'.", camera_id)
+            logger.info("DeepSORT instance created for camera '%s' (max_iou_dist=%.2f).", camera_id, self._max_iou_dist)
         return self._sorters[camera_id]
 
     @staticmethod
-    def _match_track_to_detection(track, detections, w: int, h: int):
-        """Find the Detection whose pixel-centre is closest to the track bbox centre."""
+    def _match_track_to_detection(track, detections: List[Detection], w: int, h: int) -> Optional[Detection]:
+        """Find the Detection that best matches the track bounding box (IoU first, generous distance fallback)."""
         if not detections:
             return None
 
-        # Track bbox is in pixel [x1,y1,x2,y2]
-        tlwh = track.to_tlwh()
-        tx = (tlwh[0] + tlwh[2] / 2) / w
-        ty = (tlwh[1] + tlwh[3] / 2) / h
+        ltrb = track.to_ltrb()
+        tx1 = max(0.0, min(1.0, float(ltrb[0] / w)))
+        ty1 = max(0.0, min(1.0, float(ltrb[1] / h)))
+        tx2 = max(0.0, min(1.0, float(ltrb[2] / w)))
+        ty2 = max(0.0, min(1.0, float(ltrb[3] / h)))
+        track_bbox = [tx1, ty1, tx2, ty2]
+        tx_cen = (tx1 + tx2) / 2.0
+        ty_cen = (ty1 + ty2) / 2.0
 
-        best_det = None
+        # 1. Best IoU match
+        best_det_iou = None
+        best_iou = 0.0
+        for det in detections:
+            iou_val = _iou(det.bbox, track_bbox)
+            if iou_val > best_iou:
+                best_iou = iou_val
+                best_det_iou = det
+
+        if best_iou >= 0.10:
+            return best_det_iou
+
+        # 2. Generous Euclidean distance fallback for fast drone speed jumps
+        best_det_dist = None
         best_dist = float("inf")
         for det in detections:
             cx, cy = det.center
-            dist = (cx - tx) ** 2 + (cy - ty) ** 2
+            dist = (cx - tx_cen) ** 2 + (cy - ty_cen) ** 2
             if dist < best_dist:
                 best_dist = dist
-                best_det = det
+                best_det_dist = det
 
-        return best_det if best_dist < 0.05 else None   # 5% of frame width threshold
+        # 0.35 in normalized coordinates allows up to 35% frame jump during high speed maneuvers
+        return best_det_dist if best_dist < (0.35 ** 2) else None
 
     def _cross_camera_ok(
         self, bbox: List[float], source_cam: str, now: float

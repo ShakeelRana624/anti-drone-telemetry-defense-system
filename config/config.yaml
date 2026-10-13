@@ -40,12 +40,14 @@ detection:
 # ─────────────────────────────────────────────────────────────────
 tracker:
   # Minimum consecutive frame hits before a track is "confirmed"
-  confirmation_frames:   5
+  confirmation_frames:   2
   # Maximum frames a track can go unmatched before deletion
   max_age:               30
   # Minimum IoU to associate a detection with an existing track
-  n_init:                3                 # DeepSORT internal init frames
+  n_init:                2                 # DeepSORT internal init frames
   max_cosine_distance:   0.40              # Re-ID appearance distance threshold
+  max_iou_distance:      0.90              # High-speed IoU distance threshold
+  max_coast_frames:      5                 # Kalman coasting frames during speed bursts
   nn_budget:             100              # Max appearance descriptors per track
 
   # Cross-camera spatial validation window (seconds)

@@ -163,10 +163,12 @@ def process_video_file(
             "event_ring_buffer_size": 100,
         },
         "tracker": {
-            "confirmation_frames":   3,
+            "confirmation_frames":   2,
             "max_age":               30,
             "n_init":                2,
             "max_cosine_distance":   0.40,
+            "max_iou_distance":      0.90,
+            "max_coast_frames":      5,
             "nn_budget":             100,
             "cross_camera_check":    False,
             "embedder":              None,

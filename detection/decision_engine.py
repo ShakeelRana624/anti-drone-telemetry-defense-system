@@ -218,17 +218,21 @@ class DecisionEngine:
 
                 candidates_for_frame.append(det)
 
-        # 2. Update missed targets (decay)
+        # 2. Update missed targets (decay with high-speed grace period)
         dead_ids = []
         for tid, m in self._targets.items():
             if tid not in seen_ids:
                 m.miss_count += 1
-                m.consecutive_hits = 0
                 m.hit_history.append(False)
-                if m.miss_count > self.max_miss_frames:
-                    dead_ids.append(tid)
+                # Grace period: If target was locked/tracking, allow 1-3 frames for speed bursts without breaking lock
+                if m.miss_count <= 3:
+                    m.consecutive_hits = max(1, m.consecutive_hits - 1)
                 else:
-                    m.state = TargetThreatState.LOST
+                    m.consecutive_hits = 0
+                    if m.miss_count > self.max_miss_frames:
+                        dead_ids.append(tid)
+                    else:
+                        m.state = TargetThreatState.LOST
 
         for tid in dead_ids:
             del self._targets[tid]
