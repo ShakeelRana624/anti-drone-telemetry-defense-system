@@ -386,10 +386,13 @@ def render_hud(
         el_val = ang["elevation_deg"] if ang else 0.0
         los_ang = ang["total_angle_deg"] if ang else 0.0
 
-        # Step 2: Distance Estimation + GPS Lat/Long
+        # Step 2: Distance Estimation + GPS Lat/Long + Speed & Motion
         gps_data = None
         if dist_estimator and ang:
-            gps_data = dist_estimator.estimate_from_detection(det, ang, track_id=str(tid) if tid is not None else None)
+            frame_time = frame_idx / max(1.0, video_fps)
+            gps_data = dist_estimator.estimate_from_detection(
+                det, ang, track_id=str(tid) if tid is not None else None, timestamp=frame_time
+            )
 
         # Color & State Text based on confirmation frames
         if m and m.state == TargetThreatState.CONFIRMED:
@@ -432,30 +435,43 @@ def render_hud(
         cv2.circle(frame, (mid_x, mid_y), 3, box_color, -1)
         cv2.putText(frame, f"BRG {true_brg:.1f} deg {cardinal}", (mid_x + 6, mid_y - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.34, CLR_WHITE, 1, cv2.LINE_AA)
 
-        # Label banner: Step 1 Bearing + Step 2 Distance/GPS
+        # Label banner: Step 1 Bearing + Step 2 Distance/GPS + Speed & Motion State
         id_str = f"#{tid}" if tid is not None else "NEW"
         tag_title = f"{det.class_name.upper()} | ID: {id_str} | {det.confidence*100:.1f}% | BRG: {true_brg:.1f} deg ({cardinal})"
         tag_sub   = f"{state_text} [Az: {rel_az:+.1f} deg | El: {el_val:+.1f} deg | LOS: {los_ang} deg]"
 
-        # Step 2 GPS + Distance line (3rd line below bbox)
+        # Telemetry lines below bbox
         if gps_data:
-            dist_line = f"{gps_data['dist_str']} | {gps_data['grd_str']}"
-            gps_line  = gps_data['gps_str']
+            dist_line  = f"{gps_data['dist_str']} | {gps_data['grd_str']}"
+            speed_line = gps_data.get("speed_str", "SPD: -- | STATUS: HOVERING")
+            gps_line   = gps_data['gps_str']
+            m_state    = gps_data.get("motion_state", "HOVERING")
         else:
-            dist_line = "DST: -- | GND: --"
-            gps_line  = "GPS: NOT CONFIGURED"
+            dist_line  = "DST: -- | GND: --"
+            speed_line = "SPD: -- | STATUS: --"
+            gps_line   = "GPS: NOT CONFIGURED"
+            m_state    = "UNKNOWN"
 
-        tag_w = max(320, max(len(tag_title), len(tag_sub), len(dist_line), len(gps_line)) * 7 + 10)
-        banner_top = max(32, py1 - 56)
-        cv2.rectangle(frame, (px1, banner_top), (min(w - 5, px1 + tag_w), max(52, py1)), CLR_HUD_BG, -1)
-        cv2.putText(frame, tag_title, (px1 + 4, banner_top + 16),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.38, CLR_ACCENT,   1, cv2.LINE_AA)
-        cv2.putText(frame, tag_sub,   (px1 + 4, banner_top + 30),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.35, box_color,    1, cv2.LINE_AA)
-        cv2.putText(frame, dist_line, (px1 + 4, banner_top + 43),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.34, CLR_YELLOW,   1, cv2.LINE_AA)
-        cv2.putText(frame, gps_line,  (px1 + 4, banner_top + 55),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.34, CLR_GREEN,    1, cv2.LINE_AA)
+        # Flight motion status dynamic color code
+        if m_state == "INBOUND":
+            spd_color = CLR_ALERT       # Red (Threat Closing In / Approaching)
+        elif m_state == "OUTBOUND":
+            spd_color = CLR_GREEN       # Green (Leaving / Receding)
+        elif m_state == "HOVERING":
+            spd_color = CLR_YELLOW      # Yellow (Stationary / Hovering Threat)
+        elif m_state == "CROSSING":
+            spd_color = CLR_CYAN        # Cyan (Crossing Sideways / Transit)
+        else:
+            spd_color = CLR_WHITE
+
+        tag_w = max(340, max(len(tag_title), len(tag_sub), len(dist_line), len(speed_line), len(gps_line)) * 7 + 10)
+        banner_top = max(42, py1 - 68)
+        cv2.rectangle(frame, (px1, banner_top), (min(w - 5, px1 + tag_w), max(68, py1)), CLR_HUD_BG, -1)
+        cv2.putText(frame, tag_title,  (px1 + 4, banner_top + 15), cv2.FONT_HERSHEY_SIMPLEX, 0.38, CLR_ACCENT, 1, cv2.LINE_AA)
+        cv2.putText(frame, tag_sub,    (px1 + 4, banner_top + 28), cv2.FONT_HERSHEY_SIMPLEX, 0.35, box_color,  1, cv2.LINE_AA)
+        cv2.putText(frame, dist_line,  (px1 + 4, banner_top + 41), cv2.FONT_HERSHEY_SIMPLEX, 0.34, CLR_YELLOW, 1, cv2.LINE_AA)
+        cv2.putText(frame, speed_line, (px1 + 4, banner_top + 53), cv2.FONT_HERSHEY_SIMPLEX, 0.34, spd_color,   1, cv2.LINE_AA)
+        cv2.putText(frame, gps_line,   (px1 + 4, banner_top + 65), cv2.FONT_HERSHEY_SIMPLEX, 0.34, CLR_GREEN,  1, cv2.LINE_AA)
 
         # Broadcast telemetry to live dashboard SSE if active
         if gps_data and m and m.state in (TargetThreatState.CONFIRMED, TargetThreatState.COOLDOWN):
@@ -473,6 +489,10 @@ def render_hud(
                     "slant_distance_m": gps_data["slant_distance_m"],
                     "ground_distance_m": gps_data["ground_distance_m"],
                     "drone_altitude_m": gps_data["drone_altitude_m"],
+                    "speed_kmh": gps_data.get("speed_kmh", 0.0),
+                    "speed_mps": gps_data.get("speed_mps", 0.0),
+                    "motion_state": gps_data.get("motion_state", "HOVERING"),
+                    "motion_label": gps_data.get("motion_label", "HOVERING (STATIONARY)"),
                     "altitude_m": gps_data["drone_altitude_m"],
                     "drone_lat": gps_data["drone_lat"],
                     "drone_lon": gps_data["drone_lon"],

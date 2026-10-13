@@ -26,9 +26,11 @@ References:
 """
 
 from __future__ import annotations
+from collections import deque
 import logging
 import math
-from typing import Any, Dict, Optional, Tuple
+import time
+from typing import Any, Deque, Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -147,6 +149,8 @@ class DistanceGPSEstimator:
 
         self._ema_alpha = float(config.get("distance_ema_alpha", _EMA_ALPHA))
         self._ema_state: Dict[str, float] = {}
+        # track_id -> deque of (timestamp, x_m, y_m, z_m, slant_distance_m, cx_norm, cy_norm, w_norm)
+        self._track_history: Dict[str, Deque[Tuple[float, ...]]] = {}
 
         self._focal_px = self._compute_focal_px()
         logger.info(
@@ -166,8 +170,10 @@ class DistanceGPSEstimator:
     def reset_ema(self, track_id=None) -> None:
         if track_id is None:
             self._ema_state.clear()
+            self._track_history.clear()
         else:
             self._ema_state.pop(str(track_id), None)
+            self._track_history.pop(str(track_id), None)
 
     def estimate(
         self,
@@ -176,6 +182,9 @@ class DistanceGPSEstimator:
         elevation_deg: float,
         true_bearing_deg: float,
         track_id=None,
+        timestamp: Optional[float] = None,
+        norm_center: Optional[Tuple[float, float]] = None,
+        norm_width: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Full Step 2 pipeline for one detection.
@@ -186,7 +195,14 @@ class DistanceGPSEstimator:
             drone_altitude_m  - estimated drone height above camera (m)
             drone_lat         - drone latitude  (WGS-84, 7 decimal places)
             drone_lon         - drone longitude (WGS-84, 7 decimal places)
+            gps_valid         - True if camera GPS configured
             confidence        - HIGH | MEDIUM | LOW
+            speed_mps         - 3D flight speed in metres/sec
+            speed_kmh         - 3D flight speed in km/h
+            radial_speed_mps  - line-of-sight range rate (- = approaching, + = receding)
+            motion_state      - HOVERING | INBOUND | OUTBOUND | CROSSING
+            motion_label      - HUD-ready state string
+            speed_str         - HUD-ready speed & flight motion string
             dist_str          - HUD-ready distance string
             grd_str           - HUD-ready ground+alt string
             gps_str           - HUD-ready GPS string
@@ -229,6 +245,95 @@ class DistanceGPSEstimator:
         else:
             conf = "HIGH"
 
+        # Optical coordinate fallbacks
+        if norm_center is not None:
+            cx_norm, cy_norm = norm_center
+        else:
+            cx_norm, cy_norm = 0.5, 0.5
+        w_norm = norm_width if norm_width is not None else (bbox_width_px / max(1.0, float(self._fw)))
+
+        # ── Stage C: Dual-Domain Kinematics (3D Cartesian + Optical Sweep/Scale) ─
+        now_ts = timestamp if timestamp is not None else time.time()
+        brg_rad = math.radians(true_bearing_deg)
+        x_pos = round(ground_dist * math.sin(brg_rad), 2)  # East offset in metres
+        y_pos = round(ground_dist * math.cos(brg_rad), 2)  # North offset in metres
+        z_pos = round(altitude, 2)                         # Up offset in metres
+
+        if tid not in self._track_history:
+            self._track_history[tid] = deque(maxlen=20)
+        hist = self._track_history[tid]
+        hist.append((now_ts, x_pos, y_pos, z_pos, slant_m, cx_norm, cy_norm, w_norm))
+
+        speed_mps = 0.0
+        speed_kmh = 0.0
+        radial_speed_mps = 0.0
+        motion_state = "HOVERING"
+        motion_label = "HOVERING (STATIONARY)"
+
+        if len(hist) >= 2:
+            # Select reference sample between 0.12s and 0.45s ago for smooth temporal differentiation
+            prev_sample = hist[0]
+            for past in hist:
+                if (now_ts - past[0]) >= 0.12:
+                    prev_sample = past
+                    break
+
+            dt = now_ts - prev_sample[0]
+            if dt >= 0.03:
+                # 1. 3D Cartesian velocity (metres per second)
+                dx = x_pos - prev_sample[1]
+                dy = y_pos - prev_sample[2]
+                dz = z_pos - prev_sample[3]
+                dist_3d = math.sqrt(dx * dx + dy * dy + dz * dz)
+                cart_speed_mps = dist_3d / dt
+
+                # 2. Radial range rate (negative = approaching, positive = receding)
+                d_slant = slant_m - prev_sample[4]
+                radial_speed_mps = round(d_slant / dt, 1)
+
+                # 3. Optical Screen Angular Sweep Rate
+                prev_cx = prev_sample[5]
+                prev_cy = prev_sample[6]
+                prev_w = max(0.005, prev_sample[7])
+                disp_screen = math.sqrt((cx_norm - prev_cx) ** 2 + (cy_norm - prev_cy) ** 2)
+                v_screen = disp_screen / dt  # screen diagonal fraction per second
+
+                # 4. Optical Scale Expansion/Contraction Rate (relative growth per sec)
+                r_scale = (w_norm - prev_w) / (prev_w * dt)
+
+                # 5. Combined Metric Speed
+                # Use tactical airspace baseline to project optical sweep onto realistic speed (km/h)
+                effective_range = max(slant_m, 25.0)
+                fov_rad = math.radians(self._fov_h)
+                opt_speed_mps = effective_range * (v_screen * fov_rad)
+                speed_mps = round(max(cart_speed_mps, opt_speed_mps), 1)
+                speed_kmh = round(speed_mps * 3.6, 1)
+
+                # 6. Multi-Factor Flight Motion State Classification
+                # State A: Ruka hua hai (Hovering / Stationary)
+                # No significant lateral motion and no significant scale change
+                is_opt_stationary = (v_screen < 0.035) and (abs(r_scale) < 0.06)
+                if is_opt_stationary and speed_kmh < 4.0:
+                    motion_state = "HOVERING"
+                    motion_label = "HOVERING (STATIONARY)"
+                # State B: Hamari taraf aa raha hai (Inbound / Approaching)
+                # Bounding box is expanding (r_scale > 0) OR range is closing in
+                elif (r_scale > 0.06 and r_scale > 0.65 * v_screen) or (radial_speed_mps < -0.4):
+                    motion_state = "INBOUND"
+                    motion_label = "INBOUND (APPROACHING)"
+                # State C: Door ja raha hai (Outbound / Receding)
+                # Bounding box is contracting (r_scale < 0) OR range is opening up
+                elif (r_scale < -0.06 and abs(r_scale) > 0.65 * v_screen) or (radial_speed_mps > 0.4):
+                    motion_state = "OUTBOUND"
+                    motion_label = "OUTBOUND (RECEDING)"
+                # State D: Side par cross kar raha hai (Crossing / Transit)
+                # Screen sweep velocity dominant across the field of view
+                else:
+                    motion_state = "CROSSING"
+                    motion_label = "TRANSIT (CROSSING)"
+
+        speed_str = f"SPD: {speed_kmh:.1f} km/h ({speed_mps:.1f} m/s) | {motion_label}"
+
         return {
             "slant_distance_m":  slant_m,
             "ground_distance_m": ground_dist,
@@ -237,6 +342,12 @@ class DistanceGPSEstimator:
             "drone_lon":         drone_lon,
             "gps_valid":         gps_valid,
             "confidence":        conf,
+            "speed_mps":         speed_mps,
+            "speed_kmh":         speed_kmh,
+            "radial_speed_mps":  radial_speed_mps,
+            "motion_state":      motion_state,
+            "motion_label":      motion_label,
+            "speed_str":         speed_str,
             "bbox_width_px":     bbox_width_px,
             "bbox_height_px":    bbox_height_px,
             "focal_px":          round(self._focal_px, 1),
@@ -246,18 +357,30 @@ class DistanceGPSEstimator:
             "gps_str":   f"GPS {drone_lat:.6f},{drone_lon:.6f}" if gps_valid else "GPS: SET CAM LAT/LON",
         }
 
-    def estimate_from_detection(self, det: Any, bearing_data: Dict[str, Any], track_id=None) -> Dict[str, Any]:
+    def estimate_from_detection(
+        self,
+        det: Any,
+        bearing_data: Dict[str, Any],
+        track_id=None,
+        timestamp: Optional[float] = None,
+    ) -> Dict[str, Any]:
         """
         Convenience wrapper: accepts Detection object + Step 1 bearing_data dict.
         det.bbox must be (x1,y1,x2,y2) normalised [0,1].
         """
         x1, y1, x2, y2 = det.bbox
+        cx = (x1 + x2) / 2.0
+        cy = (y1 + y2) / 2.0
+        w_norm = abs(x2 - x1)
         return self.estimate(
-            bbox_width_px  = abs(x2 - x1) * self._fw,
+            bbox_width_px  = w_norm * self._fw,
             bbox_height_px = abs(y2 - y1) * self._fh,
             elevation_deg  = bearing_data.get("elevation_deg",   0.0),
             true_bearing_deg = bearing_data.get("true_bearing_deg", 0.0),
             track_id       = track_id,
+            timestamp      = timestamp,
+            norm_center    = (cx, cy),
+            norm_width     = w_norm,
         )
 
     def _compute_focal_px(self) -> float:
