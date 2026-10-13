@@ -326,6 +326,8 @@
                     <th>Distance (3D)</th>
                     <th>GND Range</th>
                     <th>Altitude (Z)</th>
+                    <th>Speed & Velocity</th>
+                    <th>Flight Motion</th>
                     <th>WGS-84 Drone GPS</th>
                     <th>Confidence / Lock</th>
                     <th>Last Detect</th>
@@ -333,7 +335,7 @@
                 </thead>
                 <tbody id="telemetry-table-body">
                   <tr id="telemetry-empty-row">
-                    <td colspan="9" class="telemetry-empty-row">
+                    <td colspan="11" class="telemetry-empty-row">
                       📡 Airspace clear. Dual camera optical/thermal sensors scanning for targets...
                     </td>
                   </tr>
@@ -1364,7 +1366,9 @@
               updateAirspaceRadar(data);
 
               appendEventLog(data);
-              showToast(`🚨 Hostile target detected on ${data.camera_id || 'CAM 01'}! [BRG: ${(data.bearing_deg || 100.1).toFixed(1)}° | DST: ${(data.distance_m || 85).toFixed(0)}m]`);
+              const spdVal = parseFloat(data.speed_kmh !== undefined ? data.speed_kmh : 0.0).toFixed(1);
+              const mStateVal = data.motion_state || 'HOVERING';
+              showToast(`🚨 Hostile target detected on ${data.camera_id || 'CAM 01'}! [BRG: ${(data.bearing_deg || 100.1).toFixed(1)}° | DST: ${(data.distance_m || 85).toFixed(0)}m | SPD: ${spdVal} km/h | ${mStateVal}]`);
               startSirenCountdown(30);
               playBrowserSirenSound(30);
 
@@ -1376,7 +1380,7 @@
                 const gndVal = (data.ground_distance_m || 84).toFixed(0);
                 const latVal = (data.drone_lat || 33.685123).toFixed(5);
                 const lonVal = (data.drone_lon || 73.048934).toFixed(5);
-                bText.textContent = `TACTICAL ALERT: AERIAL DRONE DETECTED [BRG: ${brgVal}° | DST: ${dstVal}m | GND: ${gndVal}m | GPS: ${latVal}, ${lonVal}] — 30s SIREN SOUNDING`;
+                bText.textContent = `TACTICAL ALERT: AERIAL DRONE DETECTED [BRG: ${brgVal}° | DST: ${dstVal}m | GND: ${gndVal}m | SPD: ${spdVal} km/h (${mStateVal}) | GPS: ${latVal}, ${lonVal}] — 30s SIREN SOUNDING`;
                 banner.classList.add('active');
               }
 
@@ -1450,9 +1454,26 @@
       const timeStr = t.timestamp || new Date().toLocaleTimeString('en-GB', { hour12: false });
       const cardinal = getCardinalDirection(brg);
 
+      const speedKmh = parseFloat(t.speed_kmh !== undefined ? t.speed_kmh : 0.0);
+      const speedMps = parseFloat(t.speed_mps !== undefined ? t.speed_mps : 0.0);
+      const mState = t.motion_state || 'HOVERING';
+      const mLabel = t.motion_label || `${mState}`;
+
+      let motionBadge = '';
+      if (mState === 'INBOUND') {
+        motionBadge = `<span class="badge-motion badge-inbound">🔴 INBOUND</span>`;
+      } else if (mState === 'OUTBOUND') {
+        motionBadge = `<span class="badge-motion badge-outbound">🟢 OUTBOUND</span>`;
+      } else if (mState === 'CROSSING') {
+        motionBadge = `<span class="badge-motion badge-crossing">🔵 CROSSING</span>`;
+      } else {
+        motionBadge = `<span class="badge-motion badge-hovering">🟡 HOVERING</span>`;
+      }
+
       // Save to local registry
       trackedTargets[tid] = {
         tid, camId, brg, az, slant, gnd, alt, lat, lon, conf, timeStr,
+        speedKmh, speedMps, mState, mLabel,
         updated: Date.now()
       };
 
@@ -1472,6 +1493,8 @@
         <td><span style="color:#ffd166; font-weight:700;">${slant.toFixed(1)} m</span></td>
         <td><span style="color:#06d6a0; font-weight:700;">${gnd.toFixed(1)} m</span></td>
         <td><span style="color:#118ab2; font-weight:700;">${alt >= 0 ? '+' : ''}${alt.toFixed(1)} m</span></td>
+        <td><span style="color:#ff9f1c; font-weight:700;">${speedKmh.toFixed(1)} km/h</span> <span style="font-size:0.72rem; color:var(--color-muted);">(${speedMps.toFixed(1)} m/s)</span></td>
+        <td>${motionBadge}</td>
         <td><span class="gps-badge" onclick="copyGPS('${lat.toFixed(6)}, ${lon.toFixed(6)}')">📍 ${lat.toFixed(6)}, ${lon.toFixed(6)}</span></td>
         <td><span class="lock-pill">LOCKED [8/8]</span></td>
         <td style="color:var(--color-muted);">${timeStr}</td>
@@ -1494,6 +1517,15 @@
       const brg = parseFloat(t.bearing_deg !== undefined ? t.bearing_deg : (t.bearing || 90.0));
       const gnd = parseFloat(t.ground_distance_m || (parseFloat(t.distance_m || 85.0) * 0.98));
       const alt = parseFloat(t.altitude_m !== undefined ? t.altitude_m : (t.drone_altitude_m || 12.0));
+      const speedKmh = parseFloat(t.speed_kmh !== undefined ? t.speed_kmh : 0.0);
+      const mState = t.motion_state || 'HOVERING';
+      const mLabel = t.motion_label || `${mState}`;
+
+      // Dynamic color by motion state
+      let stateColor = '#ffd166';
+      if (mState === 'INBOUND') stateColor = '#ff4757';
+      else if (mState === 'OUTBOUND') stateColor = '#06d6a0';
+      else if (mState === 'CROSSING') stateColor = '#00d2d3';
 
       // Calculate Polar coordinates on scope screen
       // 0 deg = North (top), 90 deg = East (right), 180 deg = South (bottom), 270 deg = West (left)
@@ -1508,10 +1540,10 @@
         blip = document.createElement('div');
         blip.className = 'radar-blip';
         blip.id = `radar-blip-${tid.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
-        blip.title = `Target: ${tid} | Bearing: ${brg.toFixed(1)}° | Ground: ${gnd.toFixed(1)}m | Alt: ${alt.toFixed(1)}m`;
+        blip.title = `Target: ${tid} | Bearing: ${brg.toFixed(1)}° | Ground: ${gnd.toFixed(1)}m | Alt: ${alt.toFixed(1)}m | Speed: ${speedKmh.toFixed(1)} km/h (${mLabel})`;
         blip.innerHTML = `
-          <div class="radar-blip__pulse-ring"></div>
-          <div class="radar-blip__icon-box">
+          <div class="radar-blip__pulse-ring" style="border-color:${stateColor};"></div>
+          <div class="radar-blip__icon-box" style="background:${stateColor};">
             <svg class="radar-blip__svg" viewBox="0 0 24 24">
               <!-- Military Quadcopter Drone SVG Silhouette -->
               <circle cx="12" cy="12" r="3"/>
@@ -1523,7 +1555,7 @@
             </svg>
           </div>
           <div class="radar-blip__tag" id="radar-blip-tag-${tid.replace(/[^a-zA-Z0-9_-]/g, '_')}">
-            ${tid} | ${Math.round(gnd)}m | ${Math.round(brg)}°
+            ${tid} | ${Math.round(gnd)}m | ${speedKmh.toFixed(0)}km/h | ${mState}
           </div>
         `;
         container.appendChild(blip);
@@ -1535,11 +1567,11 @@
 
       const tag = document.getElementById(`radar-blip-tag-${tid.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
       if (tag) {
-        tag.textContent = `${tid} | ${Math.round(gnd)}m | ${Math.round(brg)}° | ALT ${Math.round(alt)}m`;
+        tag.textContent = `${tid} | ${Math.round(gnd)}m | ${speedKmh.toFixed(0)}km/h | ${mState}`;
       }
 
       if (footerTxt) {
-        footerTxt.innerHTML = `<span style="color:#ff4757; font-weight:800; animation:pulseDot 1s infinite;">🚨 TARGET ${tid}: ${Math.round(gnd)}m @ ${brg.toFixed(1)}° (${getCardinalDirection(brg)}) | ALT: ${alt.toFixed(1)}m</span>`;
+        footerTxt.innerHTML = `<span style="color:${stateColor}; font-weight:800; animation:pulseDot 1s infinite;">🚨 TARGET ${tid}: ${Math.round(gnd)}m @ ${brg.toFixed(1)}° (${getCardinalDirection(brg)}) | SPD: ${speedKmh.toFixed(1)} km/h | [${mLabel}]</span>`;
       }
     }
 
@@ -1590,7 +1622,7 @@
       if (tbody) {
         tbody.innerHTML = `
           <tr id="telemetry-empty-row">
-            <td colspan="9" class="telemetry-empty-row">
+            <td colspan="11" class="telemetry-empty-row">
               📡 Airspace clear. Dual camera optical/thermal sensors scanning for targets...
             </td>
           </tr>
@@ -1647,6 +1679,10 @@
           distance_m: Math.max(12.0, currentDist),
           bearing_deg: currentBrg,
           elevation_deg: 8.6,
+          speed_kmh: 48.6,
+          speed_mps: 13.5,
+          motion_state: 'INBOUND',
+          motion_label: 'INBOUND (APPROACHING)',
         };
 
         fetch('/api/telemetry/simulate', {

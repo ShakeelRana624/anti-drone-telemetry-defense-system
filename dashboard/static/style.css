@@ -2133,6 +2133,44 @@ img {
   animation: pulseDot 1s infinite;
 }
 
+.badge-motion {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0.18rem 0.52rem;
+  border-radius: 4px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.badge-inbound {
+  background: rgba(231, 29, 54, 0.22);
+  color: #ff4d6d;
+  border: 1px solid rgba(231, 29, 54, 0.55);
+  animation: pulseDot 1.2s infinite;
+}
+
+.badge-outbound {
+  background: rgba(6, 214, 160, 0.16);
+  color: #06d6a0;
+  border: 1px solid rgba(6, 214, 160, 0.45);
+}
+
+.badge-crossing {
+  background: rgba(0, 210, 211, 0.16);
+  color: #00d2d3;
+  border: 1px solid rgba(0, 210, 211, 0.45);
+}
+
+.badge-hovering {
+  background: rgba(255, 209, 102, 0.16);
+  color: #ffd166;
+  border: 1px solid rgba(255, 209, 102, 0.45);
+}
+
 .telemetry-empty-row {
   text-align: center;
   padding: 2.5rem 1rem !important;
