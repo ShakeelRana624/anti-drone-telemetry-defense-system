@@ -32,7 +32,16 @@ logger = logging.getLogger(__name__)
 
 
 def _box_iou(box1: List[float], box2: List[float]) -> float:
-    """Calculate Intersection over Union (IoU) between two normalized boxes [x1, y1, x2, y2]."""
+    """
+    Calculate Intersection over Union (IoU) between two normalized boxes.
+
+    Args:
+        box1: Normalized bounding box [x1, y1, x2, y2].
+        box2: Normalized bounding box [x1, y1, x2, y2].
+
+    Returns:
+        float: IoU overlap ratio in range [0.0, 1.0].
+    """
     x1 = max(box1[0], box2[0])
     y1 = max(box1[1], box2[1])
     x2 = min(box1[2], box2[2])
@@ -49,7 +58,17 @@ def _box_iou(box1: List[float], box2: List[float]) -> float:
 
 
 def fast_nms(detections: List[Any], iou_threshold: float = 0.45) -> List[Any]:
-    """Non-Maximum Suppression to merge overlapping slice detections."""
+    """
+    Perform Fast Non-Maximum Suppression (NMS) to eliminate duplicate overlapping bounding boxes
+    originating from overlapping image slices.
+
+    Args:
+        detections: List of Detection objects.
+        iou_threshold: Overlap IoU threshold above which lower-confidence duplicate boxes are discarded.
+
+    Returns:
+        List[Any]: Filtered list of non-overlapping Detection objects sorted by descending confidence.
+    """
     if not detections:
         return []
 
@@ -80,6 +99,15 @@ class SahiTTAEngine:
         iou_threshold: float = 0.45,
         use_tta: bool = True,
     ) -> None:
+        """
+        Initialize the high-speed SAHI + TTA inference engine.
+
+        Args:
+            slice_size: Size in pixels for slice tiles (default 256).
+            overlap_ratio: Overlap ratio between adjacent tiles (default 0.25).
+            iou_threshold: NMS overlap threshold for merging slice detections (default 0.45).
+            use_tta: Boolean flag enabling dynamic horizontal flip verification (default True).
+        """
         self.slice_size = slice_size
         self.overlap_ratio = overlap_ratio
         self.iou_threshold = iou_threshold
@@ -96,7 +124,17 @@ class SahiTTAEngine:
     ) -> List[Any]:
         """
         Execute high-speed SAHI + TTA inference on frame and return Detection objects.
-        Runs at 8+ to 12+ FPS on CPU by using adaptive interleaved sector scanning.
+        Maintains 8+ to 12+ FPS throughput on CPU via adaptive interleaved sector scanning
+        (Global Full-Frame -> Left Sky Tile -> Right Sky Tile -> Dynamic TTA Verification).
+
+        Args:
+            model: Ultralytics YOLO model object.
+            frame: Input BGR image array (numpy.ndarray).
+            conf_threshold: Minimum confidence filter threshold.
+            drone_classes: Optional list of class IDs to filter for (e.g., [0]).
+
+        Returns:
+            List[Detection]: Normalized detections in global image coordinates [0, 1].
         """
         from detection.detector import Detection
 

@@ -4,12 +4,12 @@ evidence_recorder.py — Forensic Evidence Video Generator
 Generates and archives 5–10 second tactical evidence video clips (MP4)
 for every confirmed aerial drone detection.
 
-Features:
-  • High-definition MP4 video encoding (OpenCV VideoWriter)
-  • Tactical watermarking: Bounding box, target telemetry, bearing, GPS, case ID
-  • Video catalog management (evidence_catalog.json)
-  • Accompanying high-resolution thumbnail generation
-  • Query API for web dashboard video playback & direct download
+Workflow:
+  1. Triggered on multi-frame confirmed threat detections.
+  2. Compiles historical and current video frames into high-definition MP4 clips.
+  3. Watermarks each frame with bounding boxes, telemetry, GPS coordinates, and case identifiers.
+  4. Generates high-resolution thumbnail images for dashboard previews.
+  5. Maintains a persistent JSON catalog (evidence_catalog.json) for dashboard retrieval.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 import threading
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -34,9 +34,16 @@ CATALOG_PATH = EVIDENCE_DIR / "evidence_catalog.json"
 
 
 class EvidenceRecorder:
-    """Records and catalogs forensic MP4 evidence video clips."""
+    """Records, watermarks, and catalogs forensic MP4 evidence video clips."""
 
     def __init__(self, output_dir: Optional[Path] = None) -> None:
+        """
+        Initialize the EvidenceRecorder subsystem.
+
+        Args:
+            output_dir (Optional[Path]): Target directory for evidence files and catalog.
+                                         Defaults to logs/evidence_videos.
+        """
         self.output_dir = output_dir or EVIDENCE_DIR
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.catalog_path = self.output_dir / "evidence_catalog.json"
@@ -56,8 +63,21 @@ class EvidenceRecorder:
         frames: Optional[List[np.ndarray]] = None,
     ) -> Dict[str, Any]:
         """
-        Synthesize or encode an evidence video clip from detection context.
-        If `frames` list is provided, encodes the actual sequence of recorded frames.
+        Synthesize or encode an annotated forensic evidence video clip.
+
+        Args:
+            base_frame (np.ndarray): Primary image frame representing the incident.
+            detections (List[Any]): List of active/confirmed detections with bounding boxes.
+            camera_id (str): Identifier for the recording camera source.
+            bearing_deg (float): True compass bearing or relative azimuth angle in degrees.
+            gps_coords (Tuple[float, float]): (Latitude, Longitude) of the reporting camera.
+            city (str): City or operational base sector label.
+            duration_sec (float): Target duration of the clip in seconds.
+            fps (int): Frame rate for video encoding.
+            frames (Optional[List[np.ndarray]]): Optional buffer of historical frames to encode.
+
+        Returns:
+            Dict[str, Any]: Catalog metadata entry for the generated evidence clip.
         """
         now = datetime.now()
         date_folder = self.output_dir / now.strftime("%Y-%m-%d")
@@ -112,7 +132,7 @@ class EvidenceRecorder:
             "gps": f"{gps_coords[0]:.4f} N, {gps_coords[1]:.4f} E",
             "video_path": str(video_path).replace("\\", "/"),
             "thumb_path": str(thumb_path).replace("\\", "/"),
-            "video_url": f"/api/evidence/video?path={video_path.as_posix()}",
+            "video_url": f"/api/evidence/video?filename={video_filename}&path={video_path.as_posix()}",
             "thumb_url": f"/api/snapshot?path={thumb_path.as_posix()}",
             "size_kb": round(video_path.stat().st_size / 1024, 1) if video_path.exists() else 0,
         }
@@ -121,10 +141,20 @@ class EvidenceRecorder:
         logger.warning("🎬 EVIDENCE VIDEO SAVED: %s (%s, %.1f KB)", case_id, video_path, entry["size_kb"])
         return entry
 
-    def list_evidence(self, limit: int = 30) -> List[Dict[str, Any]]:
-        """Return list of recent evidence videos for dashboard."""
+    def list_evidence(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Return the catalog of recorded evidence items.
+
+        Args:
+            limit (Optional[int]): Maximum number of recent items to return (default: all).
+
+        Returns:
+            List[Dict[str, Any]]: List of cataloged evidence dictionary entries.
+        """
         catalog = self._load_catalog()
-        return catalog[:limit]
+        if limit is not None:
+            return catalog[:limit]
+        return catalog
 
     # ── Internal Helpers ─────────────────────────────────────────
 
@@ -141,6 +171,24 @@ class EvidenceRecorder:
         is_thermal: bool,
         detections: Optional[List[Any]] = None,
     ) -> np.ndarray:
+        """
+        Watermark a single video frame with tactical overlays, bounding boxes, and telemetry.
+
+        Args:
+            frame (np.ndarray): Image array to watermark.
+            f_idx (int): Current frame index within sequence.
+            total_frames (int): Total number of frames in clip.
+            camera_id (str): Camera identifier.
+            case_id (str): Unique forensic case identifier.
+            bearing (float): Measured bearing in degrees.
+            gps (Tuple[float, float]): Camera GPS position (lat, lon).
+            city (str): Sector location name.
+            is_thermal (bool): True if source sensor is thermal/FLIR.
+            detections (Optional[List[Any]]): Detected objects in frame.
+
+        Returns:
+            np.ndarray: Watermarked and annotated frame.
+        """
         w, h = 640, 360
         t = f_idx * 0.05
         cx, cy = w // 2, h // 2
@@ -176,13 +224,13 @@ class EvidenceRecorder:
                     k = min(12, (bx2 - bx1) // 3, (by2 - by1) // 3)
                     cv2.rectangle(frame, (bx1, by1), (bx2, by2), target_box_clr, 1)
                     cv2.line(frame, (bx1, by1), (bx1 + k, by1), accent, 2)
-                    cv2.line(frame, (bx1, by1), (bx1, by1 + k), accent, 2)
+                    cv2.line(frame, (bx1, by1), (bx1 + k, by1), accent, 2)
                     cv2.line(frame, (bx2, by1), (bx2 - k, by1), accent, 2)
-                    cv2.line(frame, (bx2, by1), (bx2, by1 - k), accent, 2)
+                    cv2.line(frame, (bx2, by1), (bx2 - k, by1 + k), accent, 2)
                     cv2.line(frame, (bx1, by2), (bx1 + k, by2), accent, 2)
                     cv2.line(frame, (bx1, by2), (bx1, by2 - k), accent, 2)
                     cv2.line(frame, (bx2, by2), (bx2 - k, by2), accent, 2)
-                    cv2.line(frame, (bx2, by2), (bx2, by2 - k), accent, 2)
+                    cv2.line(frame, (bx2, by2), (bx2 - k, by2 - k), accent, 2)
 
                     # Center reticle
                     cen_x = (bx1 + bx2) // 2
@@ -218,13 +266,13 @@ class EvidenceRecorder:
 
             k = 12
             cv2.line(frame, (bx1, by1), (bx1 + k, by1), accent, 2)
-            cv2.line(frame, (bx1, by1), (bx1, by1 + k), accent, 2)
+            cv2.line(frame, (bx1, by1), (bx1 + k, by1), accent, 2)
             cv2.line(frame, (bx2, by1), (bx2 - k, by1), accent, 2)
-            cv2.line(frame, (bx2, by1), (bx2 - k, by1), accent, 2)
+            cv2.line(frame, (bx2, by1), (bx2 - k, by1 + k), accent, 2)
             cv2.line(frame, (bx1, by2), (bx1 + k, by2), accent, 2)
             cv2.line(frame, (bx1, by2), (bx1, by2 - k), accent, 2)
             cv2.line(frame, (bx2, by2), (bx2 - k, by2), accent, 2)
-            cv2.line(frame, (bx2, by2), (bx2, by2 - k), accent, 2)
+            cv2.line(frame, (bx2, by2), (bx2 - k, by2 - k), accent, 2)
             cv2.drawMarker(frame, (dx, dy), crimson, cv2.MARKER_CROSS, 14, 1)
 
             cv2.rectangle(frame, (bx1, by1 - 18), (bx1 + 175, by1), (20, 10, 40), -1)
@@ -255,6 +303,12 @@ class EvidenceRecorder:
         return frame
 
     def _append_catalog(self, entry: Dict[str, Any]) -> None:
+        """
+        Thread-safely append a newly recorded incident to the JSON evidence catalog.
+
+        Args:
+            entry (Dict[str, Any]): Incident metadata dictionary.
+        """
         with self._lock:
             catalog = self._load_catalog()
             catalog.insert(0, entry)
@@ -267,6 +321,12 @@ class EvidenceRecorder:
                 logger.error("Failed to write evidence catalog: %s", exc)
 
     def _load_catalog(self) -> List[Dict[str, Any]]:
+        """
+        Load the current evidence records from the persistent catalog file.
+
+        Returns:
+            List[Dict[str, Any]]: List of archived evidence dictionary entries.
+        """
         if self.catalog_path.exists():
             try:
                 with open(self.catalog_path, "r", encoding="utf-8") as f:
@@ -276,7 +336,7 @@ class EvidenceRecorder:
         return []
 
     def _ensure_sample_evidence(self) -> None:
-        """Pre-generate 2 high-quality tactical evidence clips if directory is empty."""
+        """Pre-generate 2 baseline forensic evidence recordings if directory is empty."""
         catalog = self._load_catalog()
         if not catalog:
             logger.info("Initializing baseline forensic evidence recordings...")
@@ -303,15 +363,25 @@ class EvidenceRecorder:
                 duration_sec=5.0,
             )
 
-    def list_evidence(self) -> List[Dict[str, Any]]:
-        """Return all cataloged forensic evidence clips."""
-        return self._load_catalog()
-
     def get_video_path(self, filename: str) -> Optional[Path]:
-        """Locate video file within the evidence directory safely."""
-        # Sanitize filename
+        """
+        Locate video file within the evidence directory safely. Searches both root and subdirectories.
+
+        Args:
+            filename (str): Name or relative path of the video file.
+
+        Returns:
+            Optional[Path]: Validated Path object if file exists, None otherwise.
+        """
+        if not filename:
+            return None
         safe_name = os.path.basename(filename)
-        path = self.output_dir / safe_name
-        if path.exists() and path.is_file():
-            return path
+        # Check direct child
+        direct_path = self.output_dir / safe_name
+        if direct_path.exists() and direct_path.is_file():
+            return direct_path
+        # Search recursive date subfolders
+        for found in self.output_dir.rglob(safe_name):
+            if found.is_file():
+                return found
         return None

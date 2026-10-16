@@ -90,6 +90,13 @@ class RfComsetInterface:
     END_MARKER = b"\xFF\xFE"
 
     def __init__(self, config: dict) -> None:
+        """
+        Initialize the RF Comset tactical interface.
+
+        Args:
+            config: RF configuration dictionary containing 'port', 'baud_rate', 'channel',
+                    'frequency_mhz', 'prerecorded_message', and unit registrations.
+        """
         self._cfg = config
         self._enabled: bool = config.get("enabled", True)
         self._port: str = config.get("port", "/dev/ttyUSB1")
@@ -107,6 +114,7 @@ class RfComsetInterface:
         self._load_persisted()
 
     def _load_persisted(self) -> None:
+        """Load persisted RF parameters (port, baud, channel, units) from rf_config.json if present."""
         if CONFIG_PATH.exists():
             try:
                 with open(CONFIG_PATH, "r", encoding="utf-8") as f:
@@ -122,6 +130,12 @@ class RfComsetInterface:
                 logger.error("Failed to load RF config: %s", exc)
 
     def save_persisted(self) -> bool:
+        """
+        Save active RF communication parameters and units list to rf_config.json.
+
+        Returns:
+            bool: True if write succeeded, False otherwise.
+        """
         try:
             CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
             with open(CONFIG_PATH, "w", encoding="utf-8") as f:
@@ -141,6 +155,14 @@ class RfComsetInterface:
     def transmit(self, context: dict) -> Dict[str, Any]:
         """
         Broadcast alert packet and pre-recorded message to all 5 RF units simultaneously.
+        Attempts hardware transmission via serial port; simulates acknowledgments if hardware offline.
+
+        Args:
+            context: Alert metadata dictionary (camera_id, bearing, count, etc.).
+
+        Returns:
+            Dict[str, Any]: Transmission report including success flag, delivery status per unit,
+                           acknowledgments, latency, and broadcast text.
         """
         if not self._enabled:
             logger.debug("RF comset disabled — skipped.")
@@ -210,7 +232,15 @@ class RfComsetInterface:
         return result
 
     def test_broadcast(self, custom_msg: Optional[str] = None) -> Dict[str, Any]:
-        """Trigger an instant test broadcast to all 5 RF units."""
+        """
+        Trigger an immediate operational test broadcast packet to all 5 RF perimeter units.
+
+        Args:
+            custom_msg: Optional custom warning text to transmit in place of template default.
+
+        Returns:
+            Dict[str, Any]: Broadcast outcome and unit reception telemetry.
+        """
         dummy_context = {
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
             "camera_id": "CAM-01 (NORTH)",
@@ -226,7 +256,15 @@ class RfComsetInterface:
         return self.transmit(dummy_context)
 
     def update_config(self, new_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Update RF configuration from web dashboard."""
+        """
+        Update runtime RF parameters (port, baud rate, frequency, channel, unit roster) and persist to disk.
+
+        Args:
+            new_data: Dictionary of changed configuration fields.
+
+        Returns:
+            Dict[str, Any]: Full updated status object.
+        """
         if "port" in new_data:
             self._port = str(new_data["port"]).strip()
         if "baud_rate" in new_data:
@@ -246,7 +284,12 @@ class RfComsetInterface:
         return self.get_status()
 
     def get_status(self) -> Dict[str, Any]:
-        """Return full RF telemetry and setup for Web Dashboard."""
+        """
+        Query current RF comset operational configuration, link status, and registered tactical units.
+
+        Returns:
+            Dict[str, Any]: Dictionary containing hardware port, channel, frequency, units, and last transmission.
+        """
         return {
             "enabled": self._enabled,
             "port": self._port,
@@ -262,16 +305,35 @@ class RfComsetInterface:
     # ── Internal ─────────────────────────────────────────────────
 
     def _format_message(self, context: dict) -> str:
+        """
+        Substitute detection context keys (camera_id, bearing, etc.) into the pre-recorded message template.
+
+        Args:
+            context: Dictionary of replacement tokens.
+
+        Returns:
+            str: Formatted warning message text.
+        """
         msg = self._prerecorded_msg
         for k, v in context.items():
             msg = msg.replace(f"{{{k}}}", str(v))
         return msg
 
     def _build_payload(self, context: dict) -> bytes:
+        """
+        Construct binary UTF-8 JSON packet payload for radio transmission.
+
+        Args:
+            context: Alert metadata dictionary.
+
+        Returns:
+            bytes: Encoded payload bytes.
+        """
         packet = {"type": "DRONE_ALERT", "channel": self._channel, "units": [u["id"] for u in self._units], **context}
         return json.dumps(packet, separators=(",", ":")).encode("utf-8")
 
     def _open(self) -> None:
+        """Open serial hardware link to RF transceiver modem."""
         try:
             import serial  # type: ignore
             if self._serial and self._serial.is_open:
@@ -282,6 +344,7 @@ class RfComsetInterface:
             self._serial = None
 
     def _close(self) -> None:
+        """Close serial connection to RF transceiver modem."""
         if self._serial and self._serial.is_open:
             try:
                 self._serial.close()
@@ -293,7 +356,15 @@ class RfComsetInterface:
 _rf_instance: Optional[RfComsetInterface] = None
 
 def get_rf_comset(config: Optional[dict] = None) -> RfComsetInterface:
-    """Return global RfComsetInterface singleton."""
+    """
+    Retrieve or initialize the global RfComsetInterface singleton instance.
+
+    Args:
+        config: Optional configuration dictionary used when instantiating singleton for the first time.
+
+    Returns:
+        RfComsetInterface: Shared singleton instance.
+    """
     global _rf_instance
     if _rf_instance is None:
         if config is None:

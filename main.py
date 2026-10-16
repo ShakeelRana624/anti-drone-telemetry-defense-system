@@ -29,11 +29,27 @@ import yaml
 # ══════════════════════════════════════════════════════════════════
 
 def load_config(path: str = "config/config.yaml") -> dict:
+    """
+    Load and parse the YAML system configuration file.
+
+    Args:
+        path: Relative or absolute path to config.yaml (default 'config/config.yaml').
+
+    Returns:
+        dict: Parsed configuration dictionary with camera, detection, alerting, and logging settings.
+    """
     with open(path, "r", encoding="utf-8") as fh:
         return yaml.safe_load(fh)
 
 
 def setup_logging(config: dict) -> None:
+    """
+    Initialize root logging infrastructure writing to both stdout and rotating system.log.
+    Configures log levels and silences noisy third-party libraries (ultralytics, werkzeug).
+
+    Args:
+        config: System configuration dictionary with 'logging' options.
+    """
     log_cfg = config.get("logging", {})
     level   = getattr(logging, log_cfg.get("level", "INFO").upper(), logging.INFO)
 
@@ -55,7 +71,12 @@ def setup_logging(config: dict) -> None:
 
 
 def ensure_directories(config: dict) -> None:
-    """Create required runtime directories if they don't exist."""
+    """
+    Verify and create all required runtime directories for models, logs, and forensic snapshots.
+
+    Args:
+        config: System configuration dictionary containing configured logging paths.
+    """
     paths = [
         "models",
         config["logging"]["event_log_dir"],
@@ -71,6 +92,12 @@ def ensure_directories(config: dict) -> None:
 # ══════════════════════════════════════════════════════════════════
 
 def main() -> None:
+    """
+    Main orchestrator and lifecycle entry point.
+    Initializes subsystems (Detector, DeepSORT, AlertManager, EventLogger, Dashboard, HealthMonitor),
+    binds POSIX/Windows OS termination signals for clean resource release, starts async threads,
+    and enters the persistent operational loop.
+    """
     # ── Config & logging ───────────────────────────────────────
     config = load_config()
     setup_logging(config)
@@ -119,6 +146,13 @@ def main() -> None:
 
     # ── Graceful shutdown handler ──────────────────────────────
     def shutdown(signum, frame):  # noqa: ANN001
+        """
+        Trap interrupt/termination signals and conduct orderly subsystem deconstruction.
+
+        Args:
+            signum: Signal number received (SIGINT or SIGTERM).
+            frame: Current execution stack frame.
+        """
         log.info("Shutdown signal received (%s). Stopping …", signum)
         camera_manager.stop()
         health_monitor.stop()
@@ -143,6 +177,7 @@ def main() -> None:
     # Keep dashboard camera status updated
     import threading, time
     def _status_sync():
+        """Periodic background worker updating active camera stream statuses in the dashboard state."""
         while True:
             dashboard.camera_status = camera_manager.status()
             time.sleep(5)
@@ -157,7 +192,10 @@ def main() -> None:
 
 
 def _windows_block() -> None:
-    """signal.pause() is not available on Windows — use a sleep loop."""
+    """
+    Persistent sleep loop for Windows operating system where signal.pause() is unavailable.
+    Blocks the main thread while background daemons execute.
+    """
     import time
     while True:
         time.sleep(1)

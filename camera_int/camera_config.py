@@ -70,12 +70,24 @@ class CameraConfigManager:
     """Manages loading, updating, and saving IP camera configurations."""
 
     def __init__(self, filepath: Optional[Path] = None) -> None:
+        """
+        Initialize the CameraConfigManager.
+
+        Args:
+            filepath: Optional custom Path to JSON configuration file (defaults to camera_int/cameras_config.json).
+        """
         self.filepath = filepath or CONFIG_PATH
         self.cameras: Dict[str, Dict[str, Any]] = {}
         self.load()
 
     def load(self) -> Dict[str, Dict[str, Any]]:
-        """Load cameras from JSON file; create defaults if file does not exist."""
+        """
+        Load camera profile configurations from disk JSON file.
+        Initializes and persists DEFAULT_CAMERAS if file does not exist.
+
+        Returns:
+            Dict[str, Dict[str, Any]]: Dictionary mapping camera_id to camera configuration dictionary.
+        """
         if self.filepath.exists():
             try:
                 with open(self.filepath, "r", encoding="utf-8") as f:
@@ -91,7 +103,12 @@ class CameraConfigManager:
         return self.cameras
 
     def save(self) -> bool:
-        """Save active configurations to disk."""
+        """
+        Write active camera configurations dictionary to disk in indented JSON format.
+
+        Returns:
+            bool: True on successful write, False otherwise.
+        """
         try:
             self.filepath.parent.mkdir(parents=True, exist_ok=True)
             with open(self.filepath, "w", encoding="utf-8") as f:
@@ -103,13 +120,37 @@ class CameraConfigManager:
             return False
 
     def get_camera(self, camera_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve configuration dictionary for a specific camera stream.
+
+        Args:
+            camera_id: Identifier string (e.g., 'primary', 'secondary').
+
+        Returns:
+            Optional[Dict[str, Any]]: Camera configuration dictionary if found, else None.
+        """
         return self.cameras.get(camera_id)
 
     def get_all(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Retrieve all registered camera configurations.
+
+        Returns:
+            Dict[str, Dict[str, Any]]: Mapping of all camera IDs to configurations.
+        """
         return self.cameras
 
     def update_camera(self, camera_id: str, new_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Update fields for a camera and persist changes."""
+        """
+        Update configuration fields for a camera profile, casting numeric/boolean values, and persist to disk.
+
+        Args:
+            camera_id: Identifier string of target camera.
+            new_data: Dictionary of updated field keys and values.
+
+        Returns:
+            Dict[str, Any]: Updated camera profile dictionary.
+        """
         if camera_id not in self.cameras:
             self.cameras[camera_id] = {"id": camera_id}
 
@@ -135,8 +176,14 @@ class CameraConfigManager:
 
     def build_stream_url(self, camera_id: str) -> str:
         """
-        Construct standard RTSP/HTTP URL based on configured parameters.
-        Example: rtsp://user:pass@192.168.1.100:554/stream1
+        Construct standard RTSP/HTTP URL or integer USB index based on configured camera parameters.
+        Format: rtsp://[user:pass@]ip:port/path
+
+        Args:
+            camera_id: Identifier of target camera.
+
+        Returns:
+            str | int: Stream connection URI or USB device index.
         """
         cam = self.cameras.get(camera_id)
         if not cam:

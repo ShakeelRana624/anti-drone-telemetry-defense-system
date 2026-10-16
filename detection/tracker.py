@@ -49,6 +49,13 @@ class DeepSORTTracker:
     """
 
     def __init__(self, config: dict) -> None:
+        """
+        Initialize the DeepSORT multi-camera tracker.
+
+        Args:
+            config: System configuration dictionary containing 'tracker' parameters (n_init, max_age,
+                    max_cosine_distance, max_iou_distance, max_coast_frames, nn_budget, cross_camera_check).
+        """
         cfg = config.get("tracker", {})
         self._confirm_n:    int   = cfg.get("confirmation_frames",   2)
         self._max_age:      int   = cfg.get("max_age",               30)
@@ -83,8 +90,18 @@ class DeepSORTTracker:
         frame: Optional[np.ndarray] = None,
     ) -> List[Detection]:
         """
-        Feed raw detections into DeepSORT for this camera.
-        Returns confirmed and Kalman-coasted detections so high-speed tracking never breaks.
+        Update DeepSORT tracks for the given camera using raw detections from current frame.
+        Performs Kalman motion prediction, association, and Kalman coasting (up to 5 frames)
+        to prevent target loss during rapid drone accelerations or momentary occlusion.
+
+        Args:
+            detections: List of Detection objects detected in current frame.
+            camera_id: Camera identifier string.
+            frame_shape: (height, width) frame dimension tuple.
+            frame: Optional BGR frame image for visual appearance embedding extraction.
+
+        Returns:
+            List[Detection]: Confirmed and Kalman-coasted Detection objects with persistent track_id.
         """
         h, w = frame_shape
 
@@ -192,7 +209,12 @@ class DeepSORTTracker:
         return confirmed_detections
 
     def reset(self, camera_id: Optional[str] = None) -> None:
-        """Clear tracker state for one or all cameras."""
+        """
+        Reset DeepSORT tracker state and Kalman histories for a specific camera or all cameras.
+
+        Args:
+            camera_id: Optional camera identifier (clears all cameras if None).
+        """
         if camera_id:
             self._sorters.pop(camera_id, None)
             self._hit_counts.pop(camera_id, None)
@@ -208,7 +230,15 @@ class DeepSORTTracker:
     # ──────────────────────────────────────────────────────────────
 
     def _get_sorter(self, camera_id: str):
-        """Return (or create) the DeepSort instance for a camera."""
+        """
+        Retrieve or instantiate the per-camera DeepSort instance.
+
+        Args:
+            camera_id: Camera identifier string.
+
+        Returns:
+            DeepSort: Active tracker instance for this stream.
+        """
         if camera_id not in self._sorters:
             try:
                 from deep_sort_realtime.deepsort_tracker import DeepSort  # type: ignore
@@ -230,7 +260,20 @@ class DeepSORTTracker:
 
     @staticmethod
     def _match_track_to_detection(track, detections: List[Detection], w: int, h: int) -> Optional[Detection]:
-        """Find the Detection that best matches the track bounding box (IoU first, generous distance fallback)."""
+        """
+        Associate a DeepSORT track hypothesis with the best matching raw Detection in the current frame.
+        Evaluates spatial IoU overlap first, then falls back to Euclidean centroid proximity
+        (up to 35% frame jump) to accommodate sudden drone flight maneuvers.
+
+        Args:
+            track: DeepSORT track object.
+            detections: List of candidate Detection instances.
+            w: Frame width in pixels.
+            h: Frame height in pixels.
+
+        Returns:
+            Optional[Detection]: Closest matching Detection instance or None.
+        """
         if not detections:
             return None
 
@@ -272,9 +315,18 @@ class DeepSORTTracker:
         self, bbox: List[float], source_cam: str, now: float
     ) -> bool:
         """
-        Return True if any OTHER camera has a recent detection
-        in a spatially overlapping region (IoU > 0.05).
-        Falls back to True if no other camera data is available.
+        Military-grade cross-sensor corroboration:
+        Validates whether another operational camera stream has registered a raw detection
+        in a matching spatial sector (IoU >= 0.05) within the active cross-camera time window.
+        Returns True immediately if only a single camera stream is active.
+
+        Args:
+            bbox: Normalized target bounding box coordinates.
+            source_cam: Camera identifier reporting the detection.
+            now: Current monotonic timestamp.
+
+        Returns:
+            bool: True if cross-camera corroborated or single camera mode, False if unverified.
         """
         other_cams = [c for c in self._raw_history if c != source_cam]
         if not other_cams:
@@ -295,6 +347,16 @@ class DeepSORTTracker:
 # ══════════════════════════════════════════════════════════════════
 
 def _iou(a: List[float], b: List[float]) -> float:
+    """
+    Calculate spatial Intersection-over-Union (IoU) overlap between two normalized bounding boxes.
+
+    Args:
+        a: First bounding box [x1, y1, x2, y2].
+        b: Second bounding box [x1, y1, x2, y2].
+
+    Returns:
+        float: Overlap score in range [0.0, 1.0].
+    """
     ax1, ay1, ax2, ay2 = a
     bx1, by1, bx2, by2 = b
     ix1 = max(ax1, bx1); iy1 = max(ay1, by1)

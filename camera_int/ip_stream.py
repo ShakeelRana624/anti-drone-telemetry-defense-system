@@ -36,8 +36,16 @@ def probe_ip_camera(
     timeout_sec: float = 2.0
 ) -> Tuple[bool, str, float]:
     """
-    Test if an IP address and port are reachable on the network.
-    Returns (success, message, latency_ms).
+    Test whether a target IP camera address and port are reachable on the network.
+    Performs a non-blocking TCP socket connect attempt.
+
+    Args:
+        ip: Target IP address or hostname.
+        port: Destination TCP port number (typically 554 for RTSP, 80/8080 for HTTP).
+        timeout_sec: Maximum wait duration in seconds before timing out.
+
+    Returns:
+        Tuple[bool, str, float]: (is_reachable, status_message, latency_milliseconds).
     """
     if not ip or ip.strip() in ["", "0.0.0.0", "localhost"]:
         return False, "Invalid or empty IP address provided.", 0.0
@@ -64,6 +72,13 @@ class IPCameraStream:
     """
 
     def __init__(self, config: Dict[str, Any]) -> None:
+        """
+        Initialize the IPCameraStream with profile parameters and geographic coordinates.
+
+        Args:
+            config: Camera configuration dictionary containing stream parameters, resolution,
+                    FPS, sensor type, and base GPS coordinates.
+        """
         self.camera_id = config.get("id", "camera")
         self.config = config
         self.source = self._resolve_source(config)
@@ -89,6 +104,15 @@ class IPCameraStream:
         self._synthetic_idx = 0
 
     def _resolve_source(self, cfg: Dict[str, Any]) -> Any:
+        """
+        Derive the OpenCV VideoCapture source descriptor (RTSP/HTTP URL string or USB index).
+
+        Args:
+            cfg: Camera configuration dictionary.
+
+        Returns:
+            str | int: Stream connection URI or USB camera index.
+        """
         mode = cfg.get("connection_mode", "ip_rtsp")
         custom = (cfg.get("custom_url") or "").strip()
         if custom:
@@ -114,6 +138,7 @@ class IPCameraStream:
         return f"rtsp://{auth}{ip}:{port}{path}"
 
     def start(self) -> None:
+        """Launch asynchronous background frame capture thread."""
         self._running = True
         self._thread = threading.Thread(
             target=self._worker_loop,
@@ -124,6 +149,7 @@ class IPCameraStream:
         logger.info("IPCameraStream [%s] initialized with source: %s", self.camera_id, self.source)
 
     def stop(self) -> None:
+        """Stop asynchronous capture thread and release hardware video capture device."""
         self._running = False
         if self._thread:
             self._thread.join(timeout=3)
@@ -136,7 +162,12 @@ class IPCameraStream:
         logger.info("IPCameraStream [%s] stopped.", self.camera_id)
 
     def update_config(self, new_config: Dict[str, Any]) -> None:
-        """Dynamically update config and re-initialize stream if source changed."""
+        """
+        Dynamically update streaming and geographical parameters; restarts stream if connection URL changes.
+
+        Args:
+            new_config: Dictionary containing updated camera profile values.
+        """
         self.config.update(new_config)
         self.city = new_config.get("city", self.city)
         self.latitude = float(new_config.get("latitude", self.latitude))
@@ -156,7 +187,13 @@ class IPCameraStream:
             self.healthy = False
 
     def read(self) -> np.ndarray:
-        """Return latest frame; falls back to tactical synthetic frame if physical camera is offline."""
+        """
+        Fetch the most recent video frame.
+        Returns latest hardware frame if connected, or renders synthetic tactical HUD frame if offline.
+
+        Returns:
+            numpy.ndarray: BGR image frame (640x360 or configured resolution).
+        """
         with self._lock:
             if self._frame is not None:
                 return self._frame.copy()
@@ -166,6 +203,10 @@ class IPCameraStream:
         return self._render_synthetic_tactical_frame(self._synthetic_idx)
 
     def _worker_loop(self) -> None:
+        """
+        Continuous background worker loop for frame polling, health monitoring,
+        FPS calculation, and automated network reconnect handling with socket fast-probing.
+        """
         interval = 1.0 / max(1, self.target_fps)
         reconnect_delay = 5.0
         last_reconnect_attempt = 0.0
@@ -233,7 +274,16 @@ class IPCameraStream:
             time.sleep(interval)
 
     def _render_synthetic_tactical_frame(self, frame_idx: int) -> np.ndarray:
-        """Render high-aesthetic tactical stream with live GPS & sensor telemetry."""
+        """
+        Synthesize high-aesthetic tactical HUD preview with live simulated targets, reticle brackets,
+        and geographic telemetry (GPS latitude, longitude, and azimuth) when hardware camera is offline.
+
+        Args:
+            frame_idx: Frame animation step counter.
+
+        Returns:
+            numpy.ndarray: Rendered BGR preview image frame (640x360).
+        """
         w, h = 640, 360
         is_thermal = self.sensor_type == "thermal"
 

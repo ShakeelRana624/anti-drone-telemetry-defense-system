@@ -1,18 +1,15 @@
 """
-app.py — Flask Live Dashboard
-==============================
-Provides a real-time web dashboard for local operator monitoring.
+app.py — Flask Live Monitoring Dashboard & Real-Time Airspace Telemetry
+========================================================================
+Provides a real-time web dashboard for local operator monitoring, telemetry
+visualization, system configuration, and alerting controls.
 
-Endpoints:
-  GET  /                → main dashboard HTML
-  GET  /api/events      → SSE stream (detection + health events)
-  GET  /api/recent      → last N events from the ring buffer (JSON)
-  GET  /api/snapshot/<path> → serve a snapshot JPEG from logs/
-  GET  /api/status      → system status JSON
-
-SSE is used for zero-latency push from detector → browser.
-All subscribers share a single module-level list of queues;
-each browser tab gets its own queue.
+Workflow:
+  1. Spawns an internal daemon HTTP server on configured host and port.
+  2. Subscribes client browsers via Server-Sent Events (SSE) for sub-second telemetry push.
+  3. Serves live MJPEG streams, tactical aerial radar data, and drone tracking positions.
+  4. Hosts REST APIs for IP camera configuration, RF Comset parameters, and siren testing.
+  5. Provides forensic evidence playback, incident reports, and system health status.
 """
 
 from __future__ import annotations
@@ -48,8 +45,13 @@ _targets_lock = threading.Lock()
 
 def push_sse_event(data: dict) -> None:
     """
-    Push an event to every active SSE subscriber.
-    Called from any thread (detector, health monitor, alert manager).
+    Push a real-time event dictionary to all connected browser SSE subscribers.
+
+    Args:
+        data (dict): Telemetry, detection, alert, or health dictionary payload.
+
+    Returns:
+        None
     """
     _event_buffer.append(data)
 
@@ -106,6 +108,13 @@ class DashboardApp:
     """
 
     def __init__(self, config: dict, event_logger) -> None:
+        """
+        Initialize the Flask live dashboard application.
+
+        Args:
+            config (dict): Full system configuration dictionary.
+            event_logger (EventLogger): System EventLogger instance for querying history.
+        """
         dash_cfg        = config.get("dashboard", {})
         self.host: str  = dash_cfg.get("host",       "0.0.0.0")
         self.port: int  = dash_cfg.get("port",        5000)
@@ -133,6 +142,12 @@ class DashboardApp:
     # ── Lifecycle ─────────────────────────────────────────────────
 
     def start(self) -> None:
+        """
+        Start the Flask dashboard server inside a background daemon thread.
+
+        Returns:
+            None
+        """
         self._thread = threading.Thread(
             target=self._run, daemon=True, name="flask-dashboard"
         )
@@ -140,21 +155,45 @@ class DashboardApp:
         logger.info("Dashboard → http://%s:%d", self.host, self.port)
 
     def stop(self) -> None:
+        """
+        Signal the dashboard server to shut down cleanly.
+
+        Returns:
+            None
+        """
         logger.info("Dashboard stopping …")
 
     # ── Routes ────────────────────────────────────────────────────
 
     def _register_routes(self) -> None:
+        """
+        Register all HTTP endpoints, API handlers, and streaming routes on the Flask app.
+
+        Returns:
+            None
+        """
         app = self.app
 
         # ── Main page ─────────────────────────────────────────────
         @app.route("/")
         def index():
+            """
+            Render the main operator monitoring dashboard single-page web interface.
+
+            Returns:
+                str: Rendered HTML template.
+            """
             return render_template("index.html")
 
         # ── SSE stream ────────────────────────────────────────────
         @app.route("/api/events")
         def sse():
+            """
+            Open a persistent Server-Sent Events (SSE) connection pushing live telemetry.
+
+            Returns:
+                Response: Streamed text/event-stream response.
+            """
             def generate():
                 q: queue.Queue = queue.Queue(maxsize=150)
                 with _subscribers_lock:
@@ -187,6 +226,12 @@ class DashboardApp:
         # ── Recent events ─────────────────────────────────────────
         @app.route("/api/recent")
         def recent():
+            """
+            Return recent logged events from the in-memory ring buffer.
+
+            Returns:
+                Response: JSON object containing recent event list and count.
+            """
             n = int(request.args.get("n", 50))
             events = self._event_logger.recent(n)
             return jsonify({"events": events, "count": len(events)})
@@ -194,6 +239,12 @@ class DashboardApp:
         # ── System status ─────────────────────────────────────────
         @app.route("/api/status")
         def status():
+            """
+            Return point-in-time system health, active cameras, and telemetry queue size.
+
+            Returns:
+                Response: JSON dictionary with timestamp, camera health, and model state.
+            """
             return jsonify({
                 "timestamp":      _utc_now(),
                 "cameras":        self.camera_status,
@@ -205,15 +256,43 @@ class DashboardApp:
         # ── Serve snapshot images ─────────────────────────────────
         @app.route("/api/snapshot")
         def snapshot():
-            path = request.args.get("path", "")
-            p = Path(path)
-            if not p.exists() or not p.is_file():
+            """
+            Serve an annotated detection snapshot JPEG with strict path traversal protection.
+
+            Returns:
+                Response: Binary JPEG image stream if allowed, or 404/403 status.
+            """
+            path_str = request.args.get("path", "")
+            if not path_str:
                 return "", 404
-            return send_file(str(p), mimetype="image/jpeg")
+            try:
+                p = Path(path_str).resolve()
+                allowed_roots = [
+                    Path("logs/snapshots").resolve(),
+                    Path("logs/evidence_videos").resolve(),
+                    Path("dashboard/static").resolve(),
+                    Path("output_videos").resolve(),
+                ]
+                if not p.is_file():
+                    return "", 404
+                is_allowed = any(p == r or r in p.parents for r in allowed_roots)
+                if not is_allowed:
+                    logger.warning("Blocked snapshot request outside allowed directories: %s", path_str)
+                    return "", 403
+                return send_file(str(p), mimetype="image/jpeg")
+            except Exception as exc:
+                logger.error("Error serving snapshot %s: %s", path_str, exc)
+                return "", 404
 
         # ── Latest snapshots list ─────────────────────────────────
         @app.route("/api/gallery")
         def gallery():
+            """
+            Return a JSON list of recent snapshot URLs for UI gallery preview.
+
+            Returns:
+                Response: JSON object containing recent snapshot file paths and URLs.
+            """
             snap_dir = Path("logs/snapshots")
             jpegs = sorted(snap_dir.rglob("*.jpg"), key=lambda f: f.stat().st_mtime, reverse=True)
             items = [
@@ -228,26 +307,56 @@ class DashboardApp:
 
         @app.route("/api/analytics/overview")
         def analytics_overview():
+            """
+            Return aggregated system KPI metrics (detections, active cameras, response time).
+
+            Returns:
+                Response: JSON object with overview metrics for the specified camera scope.
+            """
             camera = request.args.get("camera", "all").lower()
             return jsonify(_generate_overview_metrics(camera))
 
         @app.route("/api/analytics/weekly")
         def analytics_weekly():
+            """
+            Return weekly historical drone detection trends and confidence averages.
+
+            Returns:
+                Response: JSON object with day labels, counts per camera, and peak summary.
+            """
             camera = request.args.get("camera", "all").lower()
             return jsonify(_generate_weekly_data(camera))
 
         @app.route("/api/analytics/monthly")
         def analytics_monthly():
+            """
+            Return 30-day tactical incursion trends, threat categories, and compass sector distributions.
+
+            Returns:
+                Response: JSON object with daily counts, target breakdown, and compass bearings.
+            """
             camera = request.args.get("camera", "all").lower()
             return jsonify(_generate_monthly_data(camera))
 
         @app.route("/api/analytics/yearly")
         def analytics_yearly():
+            """
+            Return annual drone interception comparison and radar evaluation metrics.
+
+            Returns:
+                Response: JSON object comparing 2025 vs 2026 incursions and capability radar scores.
+            """
             camera = request.args.get("camera", "all").lower()
             return jsonify(_generate_yearly_data(camera))
 
         @app.route("/api/reports/generate")
         def reports_generate():
+            """
+            Generate and return a structured intelligence report payload for PDF or print export.
+
+            Returns:
+                Response: JSON report with date range, incident breakdown table, and tactical recommendations.
+            """
             period = request.args.get("period", "weekly").lower()
             camera = request.args.get("camera", "all").lower()
             return jsonify(_generate_report_payload(period, camera))
@@ -255,6 +364,12 @@ class DashboardApp:
         # ── Camera Integration & Configuration API (camera_int) ──
         @app.route("/api/camera/config", methods=["GET"])
         def camera_config_get():
+            """
+            Retrieve live connection state and metadata for all configured IP cameras.
+
+            Returns:
+                Response: JSON object containing per-camera status, FPS, latency, and GPS data.
+            """
             try:
                 from camera_int import get_ip_camera_manager
                 statuses = get_ip_camera_manager().get_camera_statuses()
@@ -264,6 +379,12 @@ class DashboardApp:
 
         @app.route("/api/camera/update", methods=["POST"])
         def camera_config_update():
+            """
+            Update an IP camera's configuration parameters and hot-reload its stream.
+
+            Returns:
+                Response: JSON confirmation with updated camera fields.
+            """
             try:
                 from camera_int import get_ip_camera_manager
                 data = request.get_json(force=True) or {}
@@ -275,6 +396,12 @@ class DashboardApp:
 
         @app.route("/api/camera/test", methods=["POST"])
         def camera_test_connection():
+            """
+            Probe an IP camera address and port for TCP reachability before saving settings.
+
+            Returns:
+                Response: JSON object with success boolean, status message, and round-trip latency.
+            """
             try:
                 from camera_int import get_ip_camera_manager
                 data = request.get_json(force=True) or {}
@@ -286,6 +413,15 @@ class DashboardApp:
         # ── Video Streaming (MJPEG) linked to camera_int ─────────
         @app.route("/api/video_feed/<camera_id>")
         def video_feed(camera_id: str):
+            """
+            Stream a live multipart MJPEG video feed from the specified camera stream.
+
+            Args:
+                camera_id (str): Camera identifier ('primary', 'secondary', etc.).
+
+            Returns:
+                Response: Multipart HTTP response with boundary frames.
+            """
             def gen_frames():
                 from camera_int import get_ip_camera_manager
                 import cv2
@@ -313,6 +449,12 @@ class DashboardApp:
         # ── Evidence Videos API ───────────────────────────────────
         @app.route("/api/evidence/list")
         def evidence_list():
+            """
+            Return a JSON catalog listing recorded forensic evidence video files.
+
+            Returns:
+                Response: JSON list of catalog entries with case IDs, video durations, and file paths.
+            """
             from logging_system.evidence_recorder import EvidenceRecorder
             recorder = EvidenceRecorder()
             items = recorder.list_evidence()
@@ -320,7 +462,14 @@ class DashboardApp:
 
         @app.route("/api/evidence/video")
         def evidence_video():
-            filename = request.args.get("filename", "")
+            """
+            Stream a forensic evidence MP4 video clip to the web browser.
+            Accepts either 'filename' or 'path' query parameter and validates bounds.
+
+            Returns:
+                Response: Video stream response (video/mp4) or error code.
+            """
+            filename = request.args.get("filename") or request.args.get("path", "")
             if not filename:
                 return jsonify({"error": "Missing filename"}), 400
             from logging_system.evidence_recorder import EvidenceRecorder
@@ -332,7 +481,14 @@ class DashboardApp:
 
         @app.route("/api/evidence/download")
         def evidence_download():
-            filename = request.args.get("filename", "")
+            """
+            Trigger a file download for a forensic evidence MP4 video clip.
+            Accepts either 'filename' or 'path' query parameter and validates bounds.
+
+            Returns:
+                Response: Binary download response with Content-Disposition header.
+            """
+            filename = request.args.get("filename") or request.args.get("path", "")
             if not filename:
                 return jsonify({"error": "Missing filename"}), 400
             from logging_system.evidence_recorder import EvidenceRecorder
@@ -345,6 +501,12 @@ class DashboardApp:
         # ── Tactical RF Comset API ───────────────────────────────
         @app.route("/api/rf/status", methods=["GET"])
         def rf_status():
+            """
+            Retrieve the operational status, transmission parameters, and tactical unit links of the RF comset.
+
+            Returns:
+                Response: JSON object containing RF comset channel, frequency, power, and active unit states.
+            """
             try:
                 from alerting.rf_comset import get_rf_comset
                 rf = get_rf_comset()
@@ -354,6 +516,15 @@ class DashboardApp:
 
         @app.route("/api/rf/update", methods=["POST"])
         def rf_update():
+            """
+            Update tactical RF communication parameters and synchronize across perimeter units.
+
+            Inputs:
+                JSON payload containing configurable fields: frequency_mhz, channel, tx_power_dbm, encryption_key, etc.
+
+            Returns:
+                Response: JSON confirmation with updated RF comset configuration.
+            """
             try:
                 from alerting.rf_comset import get_rf_comset
                 data = request.get_json(force=True) or {}
@@ -369,6 +540,15 @@ class DashboardApp:
 
         @app.route("/api/rf/test", methods=["POST"])
         def rf_test_broadcast():
+            """
+            Broadcast a tactical RF test message to all linked perimeter defense units.
+
+            Inputs:
+                JSON payload with optional custom 'message' string.
+
+            Returns:
+                Response: JSON status reporting per-unit delivery confirmations.
+            """
             try:
                 from alerting.rf_comset import get_rf_comset
                 data = request.get_json(force=True) or {}
@@ -382,6 +562,12 @@ class DashboardApp:
         # ── Siren Control API ─────────────────────────────────────
         @app.route("/api/siren/status", methods=["GET"])
         def siren_status():
+            """
+            Query current hardware and simulation status of perimeter sirens.
+
+            Returns:
+                Response: JSON object with active siren state, GPIO pin, mode, and remaining duration.
+            """
             try:
                 from alerting.siren import get_siren_controller
                 siren = get_siren_controller()
@@ -391,6 +577,12 @@ class DashboardApp:
 
         @app.route("/api/siren/test", methods=["POST"])
         def siren_test():
+            """
+            Trigger a 30-second test alarm cycle on perimeter acoustic sirens in a background thread.
+
+            Returns:
+                Response: JSON confirmation indicating activation initiation and scheduled duration.
+            """
             try:
                 from alerting.siren import get_siren_controller
                 siren = get_siren_controller()
@@ -401,6 +593,12 @@ class DashboardApp:
 
         @app.route("/api/siren/stop", methods=["POST"])
         def siren_stop():
+            """
+            Immediately silence and deactivate all sounding perimeter sirens.
+
+            Returns:
+                Response: JSON confirmation of immediate alarm deactivation.
+            """
             try:
                 from alerting.siren import get_siren_controller
                 siren = get_siren_controller()
@@ -412,6 +610,13 @@ class DashboardApp:
         # ── Real-Time Target Telemetry & Radar API ────────────────
         @app.route("/api/telemetry/active", methods=["GET"])
         def telemetry_active():
+            """
+            Retrieve active tracked drone targets with calculated radar coordinates, bearing, and base GPS.
+            Stale targets not updated within 60 seconds are automatically purged.
+
+            Returns:
+                Response: JSON object containing list of active targets, target count, camera base telemetry, and timestamp.
+            """
             with _targets_lock:
                 now = datetime.now(timezone.utc).timestamp()
                 # Purge targets older than 60s
@@ -533,6 +738,12 @@ class DashboardApp:
 
         @app.route("/api/telemetry/clear", methods=["POST"])
         def telemetry_clear():
+            """
+            Clear all tracked targets from memory and notify connected frontend clients via SSE.
+
+            Returns:
+                Response: JSON confirmation indicating target dictionary cleared.
+            """
             with _targets_lock:
                 _active_targets.clear()
             push_sse_event({"event": "telemetry_clear", "timestamp": _utc_now()})
@@ -541,6 +752,10 @@ class DashboardApp:
     # ── Internal ─────────────────────────────────────────────────
 
     def _run(self) -> None:
+        """
+        Internal worker method executing the Flask WSGI HTTP server loop on configured host and port.
+        Suppresses verbose werkzeug request access logs.
+        """
         import logging as _log
         _log.getLogger("werkzeug").setLevel(logging.WARNING)
         self.app.run(
@@ -553,6 +768,12 @@ class DashboardApp:
 
 
 def _utc_now() -> str:
+    """
+    Format current UTC timestamp in ISO-8601 standard format.
+
+    Returns:
+        str: Formatted UTC timestamp string (e.g., '2026-10-16T13:30:00Z').
+    """
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
@@ -561,7 +782,17 @@ def _utc_now() -> str:
 # ══════════════════════════════════════════════════════════════════
 
 def _generate_tactical_frame(camera_id: str, frame_idx: int) -> Any:
-    """Generate high-aesthetic tactical HUD camera feed with simulated detection."""
+    """
+    Generate synthetic high-aesthetic tactical HUD camera frame with simulated drone target.
+    Used as an operational preview when live camera hardware is unavailable or in simulation mode.
+
+    Args:
+        camera_id: Identifier of the camera stream ('primary', 'secondary', etc.).
+        frame_idx: Incremental frame counter used to animate Lissajous orbit kinematics.
+
+    Returns:
+        numpy.ndarray: Rendered BGR image frame (640x360) with tactical overlays, reticles, and telemetry.
+    """
     import cv2
     import numpy as np
     import math
@@ -678,6 +909,16 @@ def _generate_tactical_frame(camera_id: str, frame_idx: int) -> Any:
 # ══════════════════════════════════════════════════════════════════
 
 def _generate_overview_metrics(camera: str = "all") -> dict:
+    """
+    Generate high-level situational metrics and KPI summaries for tactical command overview.
+
+    Args:
+        camera: Camera filter scope ('all', 'primary', or 'secondary').
+
+    Returns:
+        dict: Aggregated dictionary containing weekly, monthly, and yearly detection counts,
+              active camera count, response latency, threat level, and last update time.
+    """
     if camera == "primary":
         return {
             "weekly_detections": 30,
@@ -716,6 +957,16 @@ def _generate_overview_metrics(camera: str = "all") -> dict:
 
 
 def _generate_weekly_data(camera: str = "all") -> dict:
+    """
+    Generate 7-day rolling analytical trends of aerial drone incursions.
+
+    Args:
+        camera: Scope filter ('all', 'primary', or 'secondary').
+
+    Returns:
+        dict: Time-series dictionary with day labels, camera breakdown, average confidence,
+              and drone classification summaries (quadcopters, fixed-wing, FPV micro).
+    """
     from datetime import timedelta
     days = []
     cam1_counts = [5, 8, 4, 11, 7, 9, 6]
@@ -751,6 +1002,16 @@ def _generate_weekly_data(camera: str = "all") -> dict:
 
 
 def _generate_monthly_data(camera: str = "all") -> dict:
+    """
+    Generate 30-day tactical incursion trends, hourly distributions, and sector compass histograms.
+
+    Args:
+        camera: Scope filter ('all', 'primary', or 'secondary').
+
+    Returns:
+        dict: Detailed breakdown including daily counts, vehicle classification ratios,
+              8-sector compass bearing distributions, and 24-hour diurnal activity heatmaps.
+    """
     days = [f"Oct {i:02d}" for i in range(1, 31)]
     import random
     random.seed(42)
@@ -813,6 +1074,16 @@ def _generate_monthly_data(camera: str = "all") -> dict:
 
 
 def _generate_yearly_data(camera: str = "all") -> dict:
+    """
+    Generate multi-year comparative analytical metrics and radar performance benchmarking.
+
+    Args:
+        camera: Scope filter ('all', 'primary', or 'secondary').
+
+    Returns:
+        dict: Monthly aggregates for 2025 vs 2026, 6-axis system radar capability scores,
+              and annual summary statistics.
+    """
     months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
     if camera == "primary":
@@ -849,6 +1120,17 @@ def _generate_yearly_data(camera: str = "all") -> dict:
 
 
 def _generate_report_payload(period: str, camera: str) -> dict:
+    """
+    Construct a complete structured intelligence audit report payload for downloadable briefing packets.
+
+    Args:
+        period: Timeframe aggregation ('weekly', 'monthly', or 'yearly').
+        camera: Scope of sensor data included ('all', 'primary', or 'secondary').
+
+    Returns:
+        dict: Formatted intelligence dossier containing report title, KPIs, incident log tables,
+              and perimeter security recommendations.
+    """
     now_str = datetime.now().strftime("%d %B %Y %H:%M:%S")
 
     if period == "yearly":

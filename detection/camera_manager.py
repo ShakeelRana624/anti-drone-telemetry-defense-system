@@ -44,6 +44,16 @@ class CameraStream:
         resolution: tuple,
         label: str = "",
     ) -> None:
+        """
+        Initialize an individual CameraStream double-buffered capture thread.
+
+        Args:
+            camera_id: Unique string identifier for the camera.
+            source: VideoCapture source descriptor (USB integer index, RTSP URL, or file path).
+            fps: Desired frame ingestion rate.
+            resolution: (width, height) pixel resolution tuple.
+            label: Optional human-readable camera designation.
+        """
         self.camera_id  = camera_id
         self.source     = source
         self.target_fps = fps
@@ -60,6 +70,12 @@ class CameraStream:
     # ── Lifecycle ─────────────────────────────────────────────────
 
     def start(self) -> None:
+        """
+        Open video capture device, configure capture properties, and start background frame reader thread.
+
+        Raises:
+            RuntimeError: If video source fails to open.
+        """
         self._cap = cv2.VideoCapture(self.source)
         if not self._cap.isOpened():
             raise RuntimeError(
@@ -80,6 +96,7 @@ class CameraStream:
         logger.info("Camera '%s' started  (source=%s).", self.camera_id, self.source)
 
     def stop(self) -> None:
+        """Terminate background capture thread and release OpenCV VideoCapture hardware handle."""
         self._running = False
         if self._thread:
             self._thread.join(timeout=5)
@@ -90,12 +107,19 @@ class CameraStream:
     # ── Read latest frame ─────────────────────────────────────────
 
     def read(self) -> Optional[np.ndarray]:
+        """
+        Fetch thread-safe copy of the freshest available video frame without blocking.
+
+        Returns:
+            Optional[np.ndarray]: Latest BGR video frame, or None if no frame has arrived yet.
+        """
         with self._lock:
             return self._frame.copy() if self._frame is not None else None
 
     # ── Internal capture loop ─────────────────────────────────────
 
     def _capture_loop(self) -> None:
+        """Continuous frame polling loop reading from hardware source with automatic reconnect triggers."""
         consecutive_fails = 0
         while self._running:
             ret, frame = self._cap.read()
@@ -137,6 +161,13 @@ class CameraManager:
     """
 
     def __init__(self, config: dict, detector) -> None:
+        """
+        Initialize the CameraManager with system cameras configuration and detector pipeline reference.
+
+        Args:
+            config: System configuration dictionary containing 'cameras' definitions.
+            detector: DroneDetector instance that processes incoming camera frames.
+        """
         self._cam_cfg  = config.get("cameras", {})
         self._detector = detector
 
@@ -149,6 +180,10 @@ class CameraManager:
     # ── Lifecycle ─────────────────────────────────────────────────
 
     def start(self) -> None:
+        """
+        Start all configured CameraStream capture workers and spawn dedicated processing threads
+        pulling frames for the detector pipeline.
+        """
         self._running = True
         for cam_id, stream in self._streams.items():
             try:
@@ -167,6 +202,7 @@ class CameraManager:
         logger.info("CameraManager: %d stream(s) started.", len(self._proc_threads))
 
     def stop(self) -> None:
+        """Stop all camera streams and join worker processing threads."""
         self._running = False
         for stream in self._streams.values():
             stream.stop()
@@ -177,12 +213,18 @@ class CameraManager:
     # ── Status ────────────────────────────────────────────────────
 
     def status(self) -> Dict[str, bool]:
-        """Return {camera_id: is_healthy} for the dashboard."""
+        """
+        Query health status for all camera streams.
+
+        Returns:
+            Dict[str, bool]: Mapping of {camera_id: is_healthy} for web dashboard telemetry.
+        """
         return {cid: s.healthy for cid, s in self._streams.items()}
 
     # ── Internal ─────────────────────────────────────────────────
 
     def _init_streams(self) -> None:
+        """Initialize CameraStream instances for every configured camera entry in configuration."""
         for cam_id, cam_cfg in self._cam_cfg.items():
             self._streams[cam_id] = CameraStream(
                 camera_id=cam_id,
@@ -193,7 +235,13 @@ class CameraManager:
             )
 
     def _process_loop(self, camera_id: str, stream: CameraStream) -> None:
-        """Pull frames and run detector at target FPS."""
+        """
+        Processing worker loop: pulls latest frame from stream at target FPS and submits to detector.
+
+        Args:
+            camera_id: Stream identifier string.
+            stream: CameraStream handle.
+        """
         interval = 1.0 / stream.target_fps
         while self._running:
             start = time.monotonic()

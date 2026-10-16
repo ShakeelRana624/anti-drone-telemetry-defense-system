@@ -95,6 +95,19 @@ class LaptopCameraTester:
         output_dir: Optional[str] = None,
         camera_heading: float = 0.0,
     ) -> None:
+        """
+        Initialize the standalone laptop webcam testing harness.
+
+        Args:
+            camera_index: Device index for local video capture.
+            model_path: Relative or absolute path to YOLO model weights (.onnx or .pt).
+            conf_thresh: Minimum confidence score for detection filtering.
+            target_stream_fps: Target pacing rate for UI rendering and HTTP MJPEG streaming.
+            record_duration_sec: Duration in seconds for recorded forensic evidence clips.
+            web_port: Local HTTP port for web streaming server.
+            output_dir: Optional custom directory path for saving evidence MP4 files.
+            camera_heading: Physical azimuth compass heading in degrees for bearing calculation.
+        """
         self.camera_index = camera_index
         self.model_path = model_path
         self.conf_thresh = conf_thresh
@@ -212,7 +225,12 @@ class LaptopCameraTester:
         self._start_web_server()
 
     def _load_yolo_model(self) -> Any:
-        """Load YOLO model (custom best.onnx or fallback)."""
+        """
+        Locate and instantiate YOLO model weights from priority paths or base fallback.
+
+        Returns:
+            Instantiated ultralytics.YOLO model instance.
+        """
         from ultralytics import YOLO
 
         target = PROJECT_ROOT / self.model_path
@@ -778,7 +796,16 @@ class LaptopCameraTester:
     # ── High-Speed Render Loop (70+ to 85+ FPS) ──────────────────────
 
     def run(self, headless: bool = False) -> None:
-        """Main loop: runs high-speed render & streaming pipeline at 70+ FPS!"""
+        """
+        Execute the decoupled high-speed rendering and streaming loop.
+
+        Paces HUD rendering and MJPEG frame encoding at up to 75+ FPS while
+        ingesting inferences asynchronously from the background worker. Optionally
+        displays an interactive OpenCV desktop window if not headless.
+
+        Args:
+            headless: If True, suppresses local desktop GUI window (runs browser stream only).
+        """
         cap = self._open_camera()
 
         # Start continuous camera ingestion thread
@@ -901,7 +928,28 @@ class LaptopCameraTester:
         w: int,
         h: int,
     ) -> np.ndarray:
-        """Render tactical HUD with 70+ FPS stream telemetry, decision metrics, and bearing angles."""
+        """
+        Render the tactical HUD overlay onto the raw video frame.
+
+        Draws:
+          - Boresight crosshair and camera physical heading reference.
+          - Tracked target bounding boxes, corner brackets, and threat state tags.
+          - Calculated line-of-sight bearing lines and compass telemetry tags.
+          - Top HUD banner showing live stream and inference FPS alongside threat level.
+          - Bottom footer showing simulated drone status and recorded evidence count.
+
+        Args:
+            frame: Raw BGR input frame numpy array.
+            detections: List of confirmed/raw Detection objects.
+            decision: Latest DecisionResult evaluation from DecisionEngine.
+            stream_fps: Measured video streaming and display refresh rate.
+            inf_fps: Measured AI detection inference rate.
+            w: Width of frame in pixels.
+            h: Height of frame in pixels.
+
+        Returns:
+            Annotated BGR frame with full tactical HUD graphics.
+        """
         target_states = decision.target_states if decision else {}
 
         # Optical boresight camera center (0.0 deg relative)
@@ -1017,7 +1065,10 @@ class LaptopCameraTester:
 # Entry Point CLI
 # ══════════════════════════════════════════════════════════════════
 
-def main():
+def main() -> None:
+    """
+    Parse command-line arguments and run the standalone laptop camera test suite.
+    """
     parser = argparse.ArgumentParser(description="Standalone Laptop Camera Drone Detection Tester (70+ FPS Stream & 8+ FPS Inference)")
     parser.add_argument("--camera", type=int, default=0, help="Camera index (default: 0)")
     parser.add_argument("--heading", type=float, default=0.0, help="Camera physical compass heading (0=N, 90=E, 180=S, 270=W). Default: 0.0 (North)")

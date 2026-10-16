@@ -48,6 +48,17 @@ class BearingCalculator:
     }
 
     def __init__(self, config: dict) -> None:
+        """
+        Initialize the bearing and elevation calculator from system configuration.
+
+        Args:
+            config: Configuration dictionary containing camera FOV and heading parameters:
+                - camera_fov_horizontal: Horizontal field of view in degrees (default: 90.0).
+                - camera_fov_vertical: Vertical field of view in degrees (default: 60.0).
+                - camera_heading_deg / azimuth_deg: Camera physical heading (default: 0.0).
+                - frame_width: Optical sensor width in pixels (default: 1280).
+                - frame_height: Optical sensor height in pixels (default: 720).
+        """
         self._fov_h: float = float(config.get("camera_fov_horizontal", 90.0))
         self._fov_v: float = float(config.get("camera_fov_vertical",   60.0))
         # Camera physical heading in real world (0° = North, 90° = East, 180° = South, 270° = West)
@@ -59,28 +70,59 @@ class BearingCalculator:
 
     @property
     def camera_heading(self) -> float:
-        """Get currently configured camera compass heading (0° - 360°)."""
+        """
+        Get currently configured camera compass heading (0° - 360°).
+
+        Returns:
+            Current camera compass heading in degrees.
+        """
         return self._camera_heading
 
     @camera_heading.setter
     def camera_heading(self, heading_deg: float) -> None:
-        """Set camera compass heading (0° = North, 90° = East, 180° = South, 270° = West)."""
+        """
+        Set camera compass heading normalized to the [0.0, 360.0) range.
+
+        Args:
+            heading_deg: Raw camera physical heading in degrees (0°=N, 90°=E, 180°=S, 270°=W).
+        """
         self._camera_heading = float(heading_deg) % 360.0
 
     def set_camera_heading(self, heading_deg: float) -> None:
-        """Set camera compass heading (0° - 360°)."""
+        """
+        Convenience setter for camera compass heading (0° - 360°).
+
+        Args:
+            heading_deg: Heading angle in degrees.
+        """
         self.camera_heading = heading_deg
 
     @classmethod
     def degrees_to_cardinal(cls, heading_deg: float) -> str:
-        """Convert a 0°-360° compass heading to 16-point cardinal abbreviation (e.g. 'N', 'NE', 'ESE')."""
+        """
+        Convert a 0°-360° compass heading to 16-point cardinal abbreviation.
+
+        Args:
+            heading_deg: Compass azimuth in degrees.
+
+        Returns:
+            16-point cardinal compass point string (e.g., 'N', 'NE', 'ESE', 'SSW').
+        """
         norm_deg = float(heading_deg) % 360.0
         idx = int(round(norm_deg / 22.5)) % 16
         return cls.CARDINAL_POINTS_16[idx]
 
     @classmethod
     def get_cardinal_full_name(cls, cardinal_abbr: str) -> str:
-        """Get full descriptive name (e.g. 'ESE' -> 'East-South-East')."""
+        """
+        Retrieve the full human-readable name corresponding to a cardinal abbreviation.
+
+        Args:
+            cardinal_abbr: Short cardinal code (e.g., 'ESE', 'NW').
+
+        Returns:
+            Full cardinal name (e.g., 'East-South-East', 'North-West').
+        """
         return cls.CARDINAL_NAMES.get(cardinal_abbr, cardinal_abbr)
 
     # ── Public API ────────────────────────────────────────────────
@@ -91,8 +133,14 @@ class BearingCalculator:
         camera_id: str = "primary",
     ) -> float:
         """
-        Horizontal bearing to the primary (largest) confirmed drone relative to boresight.
-        Returns bearing in degrees [-fov/2 to +fov/2].
+        Compute horizontal bearing to the primary (largest area) confirmed drone relative to boresight.
+
+        Args:
+            detections: List of Detection objects with .area and .center attributes.
+            camera_id: Identifier of the reporting optical sensor.
+
+        Returns:
+            Relative bearing angle in degrees [-fov_h/2, +fov_h/2] relative to center optical axis.
         """
         if not detections:
             return 0.0
@@ -104,8 +152,14 @@ class BearingCalculator:
 
     def estimate_elevation(self, detections: List) -> float:
         """
-        Vertical elevation angle to the primary drone.
-        Positive = above horizon (sky), Negative = below horizon.
+        Compute vertical elevation angle to the primary (largest area) detected drone.
+
+        Args:
+            detections: List of Detection objects with .area and .center attributes.
+
+        Returns:
+            Elevation angle in degrees [-fov_v/2, +fov_v/2].
+            Positive indicates above the optical center (skywards), negative indicates below.
         """
         if not detections:
             return 0.0
@@ -115,7 +169,17 @@ class BearingCalculator:
         return elevation
 
     def full_estimate(self, detections: List, camera_id: str = "primary") -> dict:
-        """Return relative bearing, elevation, and true compass heading."""
+        """
+        Compute a complete angular estimation package for the primary drone detection.
+
+        Args:
+            detections: List of Detection objects.
+            camera_id: Camera sensor identifier.
+
+        Returns:
+            Dictionary containing relative bearing, elevation, camera heading, true compass bearing,
+            cardinal sector, and camera identifier.
+        """
         rel_bearing = self.estimate(detections, camera_id)
         elevation   = self.estimate_elevation(detections)
         true_bearing = round((self._camera_heading + rel_bearing) % 360.0, 2)
@@ -135,12 +199,22 @@ class BearingCalculator:
         camera_heading: Optional[float] = None
     ) -> dict:
         """
-        Calculate Step 1 True Compass Angle & Telemetry for a target detection:
-          1. Relative Azimuth: (-fov/2 to +fov/2) relative to camera lens center
-          2. Vertical Elevation: (+sky / -ground)
-          3. Total LOS Angle: direct angular divergence from boresight
-          4. True Compass Bearing: (Camera Heading + Relative Azimuth) mod 360°
-          5. Cardinal Direction: 16-point compass sector (N, NE, E, ESE, S, etc.)
+        Calculate complete True Compass telemetry and line-of-sight metrics for an individual detection.
+
+        Computes:
+          1. Relative Azimuth: (-fov/2 to +fov/2) relative to camera lens center.
+          2. Vertical Elevation: (+sky / -ground).
+          3. Total LOS Angle: direct compound angular divergence from boresight.
+          4. True Compass Bearing: (Camera Heading + Relative Azimuth) mod 360°.
+          5. Cardinal Direction: 16-point compass sector (N, NE, E, ESE, S, etc.).
+
+        Args:
+            det: Detection object with normalized center coordinates (cx, cy).
+            camera_heading: Optional override for camera orientation heading in degrees.
+
+        Returns:
+            Dictionary with azimuth, elevation, LOS divergence, true compass bearing,
+            cardinal codes, and formatted display strings for UI overlays.
         """
         cx, cy = getattr(det, "center", (0.5, 0.5))
 
@@ -184,6 +258,15 @@ class BearingCalculator:
         detections: List,
         camera_heading: Optional[float] = None
     ) -> List[dict]:
-        """Compute True Compass metrics for all detections in the frame."""
+        """
+        Compute True Compass metrics and line-of-sight angles for all detections in a frame.
+
+        Args:
+            detections: List of Detection instances.
+            camera_heading: Optional override for camera orientation heading in degrees.
+
+        Returns:
+            List of telemetry dictionaries, one per detection.
+        """
         return [self.calculate_for_detection(d, camera_heading) for d in detections]
 

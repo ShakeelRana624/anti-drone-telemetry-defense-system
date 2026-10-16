@@ -33,6 +33,13 @@ logger = logging.getLogger(__name__)
 
 
 def parse_args() -> argparse.Namespace:
+    """
+    Parse command-line arguments for YOLO11m drone detector training.
+
+    Returns:
+        argparse.Namespace containing parsed CLI options for model path, dataset YAML,
+        hyperparameters, training hardware device, and output paths.
+    """
     p = argparse.ArgumentParser(
         description="Train YOLO11m drone detector",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -56,6 +63,19 @@ def parse_args() -> argparse.Namespace:
 
 
 def train(args: argparse.Namespace) -> None:
+    """
+    Execute YOLO11m fine-tuning and evaluation workflow on the specified drone dataset.
+
+    Executes:
+      1. Base weight loading and output directory initialization.
+      2. Hyperparameter and augmentation configuration (mosaic, mixup, HSV, AdamW).
+      3. Distributed/local GPU or CPU training loop with periodic checkpointing.
+      4. Validation run on the test set using the best generated weights.
+      5. Deployment artifact copying (models/drone_yolo11m.pt) for live inference.
+
+    Args:
+        args: Parsed command-line arguments.
+    """
     try:
         from ultralytics import YOLO  # type: ignore
     except ImportError:
@@ -143,6 +163,9 @@ def train(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    """
+    Main CLI entrypoint for invoking detector model training.
+    """
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)-8s] %(name)s: %(message)s",

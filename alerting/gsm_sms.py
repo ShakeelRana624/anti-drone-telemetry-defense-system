@@ -33,6 +33,13 @@ class GsmSmsNotifier:
     """
 
     def __init__(self, config: dict) -> None:
+        """
+        Initialize the GSM/SMS alert notifier.
+
+        Args:
+            config: Alerting configuration dictionary containing 'enabled', 'port', 'baud_rate',
+                    'recipients', and 'message_template'.
+        """
         self._enabled:    bool        = config.get("enabled",    True)
         self._port:       str         = config.get("port",       "/dev/ttyUSB0")
         self._baud:       int         = config.get("baud_rate",  9600)
@@ -46,7 +53,12 @@ class GsmSmsNotifier:
     # ── Public API ────────────────────────────────────────────────
 
     def send_alert(self, context: dict) -> None:
-        """Send alert SMS to all configured recipients."""
+        """
+        Format the alert template with detection telemetry and dispatch SMS to all configured recipients.
+
+        Args:
+            context: Alert metadata dictionary (e.g. timestamp, camera_id, bearing, count).
+        """
         if not self._enabled:
             logger.debug("GSM/SMS disabled — skipped.")
             return
@@ -61,6 +73,7 @@ class GsmSmsNotifier:
     # ── Internal ─────────────────────────────────────────────────
 
     def _open(self) -> None:
+        """Open and configure the serial connection to the GSM modem in SMS text mode."""
         import serial  # type: ignore
         if self._serial and self._serial.is_open:
             return
@@ -70,6 +83,13 @@ class GsmSmsNotifier:
         self._at("AT+CMGF=1")   # SMS text mode
 
     def _send(self, number: str, message: str) -> None:
+        """
+        Transmit an individual SMS message to a phone number via AT+CMGS command sequence.
+
+        Args:
+            number: Recipient telephone number in E.164 format.
+            message: Formatted text message payload.
+        """
         try:
             self._open()
             self._at(f'AT+CMGS="{number}"')
@@ -84,6 +104,15 @@ class GsmSmsNotifier:
             logger.error("GSM/SMS send to %s failed: %s", number, exc)
 
     def _at(self, cmd: str) -> str:
+        """
+        Write an AT command to the serial modem and read the response.
+
+        Args:
+            cmd: AT command string without trailing CR/LF.
+
+        Returns:
+            str: Decoded response string from modem.
+        """
         self._serial.write((cmd + "\r\n").encode())
         time.sleep(0.5)
         resp = self._serial.read(self._serial.in_waiting).decode(errors="ignore")
@@ -91,5 +120,6 @@ class GsmSmsNotifier:
         return resp
 
     def close(self) -> None:
+        """Gracefully close the hardware serial port connection to the GSM modem."""
         if self._serial and self._serial.is_open:
             self._serial.close()

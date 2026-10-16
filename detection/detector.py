@@ -53,6 +53,17 @@ class Detection:
         track_id: Optional[int] = None,
         is_coasted: bool = False,
     ) -> None:
+        """
+        Initialize a Detection instance.
+
+        Args:
+            bbox: Normalized bounding box coordinates [x1, y1, x2, y2] bounded [0, 1].
+            confidence: Classifier confidence probability score [0, 1].
+            class_id: Integer class identifier.
+            class_name: String label of detected object class (e.g., 'drone').
+            track_id: Optional tracking identifier assigned by DeepSORT.
+            is_coasted: Flag indicating Kalman filter coasted/predicted position without raw visual hit.
+        """
         self.bbox       = bbox
         self.confidence = confidence
         self.class_id   = class_id
@@ -62,20 +73,32 @@ class Detection:
 
     @property
     def center(self) -> tuple[float, float]:
+        """Normalized horizontal and vertical center point (cx, cy)."""
         x1, y1, x2, y2 = self.bbox
         return (x1 + x2) / 2.0, (y1 + y2) / 2.0
 
     @property
     def area(self) -> float:
+        """Normalized surface area of bounding box."""
         x1, y1, x2, y2 = self.bbox
         return max(0.0, x2 - x1) * max(0.0, y2 - y1)
 
     def to_ltwh_pixels(self, w: int, h: int) -> List[float]:
-        """Convert normalised bbox to [left, top, width, height] in pixels (DeepSORT format)."""
+        """
+        Convert normalized bounding box [x1, y1, x2, y2] to pixel [left, top, width, height] for DeepSORT.
+
+        Args:
+            w: Image width in pixels.
+            h: Image height in pixels.
+
+        Returns:
+            List[float]: [left, top, width, height] in pixel dimensions.
+        """
         x1, y1, x2, y2 = self.bbox
         return [x1 * w, y1 * h, (x2 - x1) * w, (y2 - y1) * h]
 
     def __repr__(self) -> str:
+        """String representation showing class, track ID, confidence, and center coordinates."""
         cx, cy = self.center
         tid_str = f" id={self.track_id}" if self.track_id is not None else ""
         return (
@@ -111,6 +134,18 @@ class DroneDetector:
         evidence_recorder: Optional[EvidenceRecorder] = None,
         decision_engine: Optional[DecisionEngine] = None,
     ) -> None:
+        """
+        Initialize DroneDetector with vision model, tracker, decision engine, and alert systems.
+
+        Args:
+            config: Full system configuration dictionary.
+            tracker: DeepSORTTracker instance.
+            alert_manager: AlertManager instance.
+            event_logger: EventLogger instance.
+            snapshot_saver: SnapshotSaver instance.
+            evidence_recorder: Optional EvidenceRecorder for MP4 video clips.
+            decision_engine: Optional DecisionEngine for temporal confirmation.
+        """
         self._config         = config
         self._cfg            = config["detection"]
         self._sahi_cfg       = self._cfg.get("sahi", {})
@@ -149,8 +184,9 @@ class DroneDetector:
 
     def _load_model(self) -> None:
         """
-        Load YOLO11m model.
-        Priority: custom trained (models/drone_yolo11m.pt) → pretrained fallback.
+        Load YOLO weights according to prioritization hierarchy:
+        custom trained ONNX/PT model (model/best.onnx, models/drone_yolo11m.pt) -> pretrained fallback (yolo11m.pt).
+        Wraps with SAHI when configured.
         """
         try:
             from ultralytics import YOLO  # type: ignore
@@ -204,7 +240,12 @@ class DroneDetector:
         )
 
     def _load_sahi_wrapper(self, model_path: str) -> None:
-        """Wrap YOLO11m with SAHI's AutoDetectionModel."""
+        """
+        Instantiate SAHI AutoDetectionModel wrapper around YOLO weights.
+
+        Args:
+            model_path: Filesystem path to YOLO model.
+        """
         try:
             from sahi import AutoDetectionModel  # type: ignore
             self._sahi_model = AutoDetectionModel.from_pretrained(
@@ -225,8 +266,7 @@ class DroneDetector:
 
     def reload_model(self) -> None:
         """
-        Hot-reload model without restarting the system.
-        Call this once your training completes and you copy best.pt into place.
+        Hot-reload neural network weights at runtime without restarting the application or dropping camera feeds.
         """
         logger.info("Hot-reloading model …")
         self._load_model()
@@ -242,10 +282,18 @@ class DroneDetector:
         camera_id: str = "primary",
     ) -> List[Detection]:
         """
-        Full inference pipeline for one frame.
+        Execute full detection and tracking pipeline for a single image frame:
+          1. Run SAHI sliced inference + TTA
+          2. Update DeepSORT multi-object tracker
+          3. Evaluate temporal confirmation gate via DecisionEngine
+          4. Dispatch confirmed threats to alerting, logging, snapshots, and forensic video
 
-        Returns raw (pre-tracker) detections for this frame.
-        Confirmed tracks are forwarded to alert/logging/snapshot.
+        Args:
+            frame: Raw BGR input frame (numpy.ndarray).
+            camera_id: Identifier of the capturing camera.
+
+        Returns:
+            List[Detection]: Raw detections identified in the current frame.
         """
         h, w = frame.shape[:2]
         raw = self._infer(frame, w, h)
@@ -263,7 +311,17 @@ class DroneDetector:
     # ──────────────────────────────────────────────────────────────
 
     def _infer(self, frame: np.ndarray, w: int, h: int) -> List[Detection]:
-        """Run SAHI sliced inference (+ TTA) and return Detection list."""
+        """
+        Route frame through SAHI sliced inference engine or fallback standard full-frame inference.
+
+        Args:
+            frame: BGR input image.
+            w: Width of frame.
+            h: Height of frame.
+
+        Returns:
+            List[Detection]: Normalized candidate detections.
+        """
         if self._using_sahi and self._sahi_engine is not None:
             return self._sahi_engine.detect(
                 self._yolo_model,
@@ -274,7 +332,17 @@ class DroneDetector:
         return self._infer_standard(frame, w, h)
 
     def _infer_sahi(self, frame: np.ndarray, w: int, h: int) -> List[Detection]:
-        """SAHI sliced inference pipeline."""
+        """
+        SAHI tiled inference pipeline using official sahi package get_sliced_prediction.
+
+        Args:
+            frame: Input frame.
+            w: Frame width.
+            h: Frame height.
+
+        Returns:
+            List[Detection]: Sliced detections converted to normalized coordinates.
+        """
         try:
             from sahi.predict import get_sliced_prediction  # type: ignore
 
@@ -314,7 +382,17 @@ class DroneDetector:
             return self._infer_standard(frame, w, h)
 
     def _infer_standard(self, frame: np.ndarray, w: int, h: int) -> List[Detection]:
-        """Standard YOLO11m inference with optional TTA."""
+        """
+        Standard single-pass YOLO inference with optional test-time augmentation (TTA).
+
+        Args:
+            frame: Input image array.
+            w: Frame width.
+            h: Frame height.
+
+        Returns:
+            List[Detection]: Normalized detections.
+        """
         results = self._yolo_model.predict(
             source=frame,
             conf=self._conf,
@@ -350,7 +428,14 @@ class DroneDetector:
         frame: np.ndarray,
         camera_id: str,
     ) -> None:
-        """Dispatch confirmed detections to all downstream systems."""
+        """
+        Dispatch confirmed threats to SnapshotSaver, EventLogger, AlertManager, and EvidenceRecorder.
+
+        Args:
+            detections: List of confirmed target detections.
+            frame: Current video frame.
+            camera_id: Stream identifier.
+        """
         snapshot_path = self._snapshot_saver.save(frame, detections, camera_id)
         self._event_logger.log_detection(detections, camera_id, snapshot_path)
         self._alert_manager.trigger(detections, camera_id)
@@ -382,12 +467,15 @@ class DroneDetector:
 
     @property
     def model_path(self) -> str:
+        """Filesystem path to active model weights."""
         return self._model_path
 
     @property
     def using_sahi(self) -> bool:
+        """Boolean indicating whether SAHI sliced inference is active."""
         return self._using_sahi and self._sahi_model is not None
 
     @property
     def using_tta(self) -> bool:
+        """Boolean indicating whether Test-Time Augmentation is enabled."""
         return self._using_tta

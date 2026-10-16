@@ -38,6 +38,12 @@ class AlertManager:
     """
 
     def __init__(self, config: dict) -> None:
+        """
+        Initialize AlertManager with configured alert channels and cooldown timers.
+
+        Args:
+            config: System configuration dictionary containing 'alerting' and 'bearing' blocks.
+        """
         self._cfg  = config.get("alerting", {})
         self._cooldown: float = float(self._cfg.get("cooldown_seconds", 60))
 
@@ -57,8 +63,13 @@ class AlertManager:
 
     def trigger(self, detections: List, camera_id: str) -> None:
         """
-        Trigger all alert channels for a confirmed detection.
-        Respects per-camera cooldown.
+        Trigger all configured alert channels for a confirmed detection event.
+        Enforces per-camera cooldown timers to prevent alert flooding.
+        Spawns non-blocking daemon threads for siren, GSM SMS, landline, RF comset, and SSE push.
+
+        Args:
+            detections: List of confirmed Detection objects associated with the event.
+            camera_id: Unique identifier string of the reporting camera stream.
         """
         now = time.monotonic()
         with self._lock:
@@ -101,7 +112,15 @@ class AlertManager:
         # thread can continue processing frames immediately.
 
     def cooldown_remaining(self, camera_id: str) -> float:
-        """Seconds remaining on this camera's cooldown (0 if ready)."""
+        """
+        Compute seconds remaining on a specific camera stream's alert cooldown window.
+
+        Args:
+            camera_id: Unique camera identifier string.
+
+        Returns:
+            float: Seconds remaining until next alert permitted (0.0 if cooldown expired).
+        """
         elapsed = time.monotonic() - self._last_alert.get(camera_id, 0.0)
         return max(0.0, self._cooldown - elapsed)
 
@@ -110,31 +129,41 @@ class AlertManager:
     # ──────────────────────────────────────────────────────────────
 
     def _fire_siren(self) -> None:
+        """Execute siren controller activation safely within background worker thread."""
         try:
             self.siren.activate()
         except Exception as exc:
             logger.error("Siren failed: %s", exc)
 
     def _fire_gsm(self, context: dict) -> None:
+        """Dispatch cellular SMS notifications to configured recipient list."""
         try:
             self.gsm.send_alert(context)
         except Exception as exc:
             logger.error("GSM/SMS failed: %s", exc)
 
     def _fire_landline(self) -> None:
+        """Initiate automated PSTN landline voice call dispatch."""
         try:
             self.landline.dial()
         except Exception as exc:
             logger.error("Landline failed: %s", exc)
 
     def _fire_rf(self, context: dict) -> None:
+        """Broadcast tactical RF packet to perimeter receiver units."""
         try:
             self.rf.transmit(context)
         except Exception as exc:
             logger.error("RF comset failed: %s", exc)
 
     def _push_dashboard(self, context: dict, detections: List) -> None:
-        """Push alert event to Flask SSE stream."""
+        """
+        Push real-time alert event to web dashboard clients via Server-Sent Events (SSE).
+
+        Args:
+            context: Alert metadata dictionary (timestamp, camera_id, bearing, count).
+            detections: List of active detections.
+        """
         try:
             from dashboard.app import push_sse_event  # type: ignore
             push_sse_event({

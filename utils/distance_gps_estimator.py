@@ -55,11 +55,22 @@ _EMA_ALPHA = 0.25  # 0.25 = ~4-frame lag at 25 FPS
 _MIN_BBOX_PX = 8
 
 
-def _vincenty_direct(lat1_deg, lon1_deg, bearing_deg, distance_m):
+def _vincenty_direct(lat1_deg: float, lon1_deg: float, bearing_deg: float, distance_m: float) -> Tuple[float, float]:
     """
-    Vincenty Direct Formula on WGS-84 ellipsoid.
-    Given start point, initial bearing and distance, compute destination GPS.
-    Accuracy: sub-millimetre over any distance on Earth.
+    Compute destination GPS coordinates using the Vincenty Direct Formula on the WGS-84 ellipsoid.
+
+    Solves the direct geodetic problem: given initial coordinates (lat1, lon1), true compass
+    bearing, and geodesic distance along the ellipsoid surface, computes the target coordinates.
+    Provides sub-millimeter precision across terrestrial distances.
+
+    Args:
+        lat1_deg: Starting latitude in decimal degrees (-90.0 to +90.0).
+        lon1_deg: Starting longitude in decimal degrees (-180.0 to +180.0).
+        bearing_deg: Initial geodetic azimuth/bearing in decimal degrees (0°=N, 90°=E).
+        distance_m: Geodesic ground distance along the ellipsoid in meters.
+
+    Returns:
+        Tuple of (lat2_deg, lon2_deg) rounded to 7 decimal places (~1.1 cm resolution).
     """
     if distance_m < 0.01:
         return lat1_deg, lon1_deg
@@ -135,6 +146,12 @@ class DistanceGPSEstimator:
     """
 
     def __init__(self, config: dict) -> None:
+        """
+        Initialize the distance estimator and GPS projector from system configuration.
+
+        Args:
+            config: Configuration dictionary defining optics, reference drone scale, and sensor coordinates.
+        """
         self._fov_h = float(config.get("camera_fov_horizontal", 80.0))
         self._fov_v = float(config.get("camera_fov_vertical",   60.0))
         self._fw    = int(config.get("frame_width",  1280))
@@ -161,13 +178,32 @@ class DistanceGPSEstimator:
         )
 
     def set_camera_gps(self, lat: float, lon: float) -> None:
+        """
+        Update the base camera GPS coordinates used for target geo-projection.
+
+        Args:
+            lat: Camera latitude in decimal degrees.
+            lon: Camera longitude in decimal degrees.
+        """
         self._cam_lat = float(lat)
         self._cam_lon = float(lon)
 
     def set_drone_reference_width(self, width_m: float) -> None:
+        """
+        Override the real-world drone reference diagonal/width in meters.
+
+        Args:
+            width_m: Target reference width/diagonal in meters.
+        """
         self._drone_width_m = float(width_m)
 
     def reset_ema(self, track_id=None) -> None:
+        """
+        Reset EMA distance filter and kinematic track history.
+
+        Args:
+            track_id: Optional track ID to reset individually; if None, resets all active tracks.
+        """
         if track_id is None:
             self._ema_state.clear()
             self._track_history.clear()
@@ -365,8 +401,19 @@ class DistanceGPSEstimator:
         timestamp: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
-        Convenience wrapper: accepts Detection object + Step 1 bearing_data dict.
-        det.bbox must be (x1,y1,x2,y2) normalised [0,1].
+        Convenience wrapper executing the Step 2 estimation pipeline from a Detection object.
+
+        Extracts bounding box dimensions, combines with Step 1 bearing and elevation data,
+        and computes the full distance, altitude, 3D speed, motion state, and GPS coordinates.
+
+        Args:
+            det: Detection object containing normalized bbox (x1, y1, x2, y2).
+            bearing_data: Telemetry dictionary output from BearingCalculator.
+            track_id: Optional persistent tracker ID.
+            timestamp: Optional POSIX timestamp for kinematic time differentiation.
+
+        Returns:
+            Complete telemetry dictionary including range, altitude, speed, and GPS coordinates.
         """
         x1, y1, x2, y2 = det.bbox
         cx = (x1 + x2) / 2.0
@@ -384,5 +431,11 @@ class DistanceGPSEstimator:
         )
 
     def _compute_focal_px(self) -> float:
-        """f_px = (W_px/2) / tan(FOV_H/2)"""
+        """
+        Compute camera focal length in pixels using the pinhole camera geometry:
+            f_px = (W_px / 2) / tan(FOV_H / 2)
+
+        Returns:
+            Equivalent focal length in pixels.
+        """
         return (self._fw / 2.0) / math.tan(math.radians(self._fov_h / 2.0))

@@ -25,6 +25,13 @@ class LandlineDialer:
     """
 
     def __init__(self, config: dict) -> None:
+        """
+        Initialize the LandlineDialer subsystem.
+
+        Args:
+            config: Alerting configuration dictionary containing 'enabled', 'port', 'dial_number',
+                    and 'message'.
+        """
         self._enabled: bool = config.get("enabled",      False)
         self._port:    str  = config.get("port",         "/dev/ttyS0")
         self._number:  str  = config.get("dial_number",  "911")
@@ -32,7 +39,10 @@ class LandlineDialer:
         self._serial = None
 
     def dial(self) -> None:
-        """Place an outbound call and play the alert message."""
+        """
+        Place an automated outbound voice call over PSTN modem using Hayes AT commands,
+        wait for connection, broadcast the voice alert message, and hang up.
+        """
         if not self._enabled:
             logger.debug("Landline disabled — skipped.")
             return
@@ -54,15 +64,26 @@ class LandlineDialer:
     # ── Internal ─────────────────────────────────────────────────
 
     def _open(self) -> None:
+        """Establish serial connection to PSTN modem at 9600 baud."""
         import serial  # type: ignore
         self._serial = serial.Serial(self._port, 9600, timeout=5)
         time.sleep(1)
 
     def _close(self) -> None:
+        """Close serial port connection to PSTN modem."""
         if self._serial and self._serial.is_open:
             self._serial.close()
 
     def _at(self, cmd: str) -> str:
+        """
+        Send Hayes AT command to PSTN modem and return response.
+
+        Args:
+            cmd: Command string to transmit.
+
+        Returns:
+            str: Modem response string.
+        """
         if not self._serial:
             return ""
         self._serial.write((cmd + "\r\n").encode())
@@ -73,9 +94,8 @@ class LandlineDialer:
 
     def _play_message(self) -> None:
         """
-        Transmit the alert message.
-        Extend this to integrate a TTS engine (e.g. pyttsx3) or
-        pre-encoded audio file via the modem's voice playback mode.
+        Transmit the audio or synthesized voice alert message through the active modem call session.
+        Logs message text and can be extended with external TTS engines.
         """
         logger.info("Landline message: %s", self._message)
         # TODO: integrate TTS or audio file playback

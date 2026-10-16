@@ -40,6 +40,12 @@ class SystemHealthMonitor:
     """
 
     def __init__(self, config: dict) -> None:
+        """
+        Initialize the system health monitor with thresholds and sampling interval.
+
+        Args:
+            config: System configuration dictionary containing 'system_health' section.
+        """
         cfg = config.get("system_health", {})
         self._interval:  int   = cfg.get("check_interval_seconds",        30)
         self._cpu_thr:   float = cfg.get("cpu_threshold_percent",          85.0)
@@ -54,6 +60,9 @@ class SystemHealthMonitor:
     # ── Lifecycle ─────────────────────────────────────────────────
 
     def start(self) -> None:
+        """
+        Start the background polling thread for system health monitoring.
+        """
         self._running = True
         self._thread  = threading.Thread(
             target=self._loop, daemon=True, name="health-monitor"
@@ -62,6 +71,9 @@ class SystemHealthMonitor:
         logger.info("SystemHealthMonitor started (interval=%ds).", self._interval)
 
     def stop(self) -> None:
+        """
+        Stop the background polling thread and wait for clean termination.
+        """
         self._running = False
         if self._thread:
             self._thread.join(timeout=5)
@@ -69,11 +81,20 @@ class SystemHealthMonitor:
 
     @property
     def latest(self) -> Optional[HealthSnapshot]:
+        """
+        Retrieve the most recently recorded system health snapshot.
+
+        Returns:
+            Latest HealthSnapshot instance or None if no samples have been collected.
+        """
         return self._latest
 
     # ── Internal ─────────────────────────────────────────────────
 
     def _loop(self) -> None:
+        """
+        Continuous background sampling loop executed inside the worker thread.
+        """
         while self._running:
             snap = self._sample()
             self._latest = snap
@@ -82,6 +103,12 @@ class SystemHealthMonitor:
             time.sleep(self._interval)
 
     def _sample(self) -> HealthSnapshot:
+        """
+        Sample current CPU, RAM, disk, and thermal sensor readings.
+
+        Returns:
+            HealthSnapshot instance with current metric values.
+        """
         try:
             import psutil  # type: ignore
             cpu  = psutil.cpu_percent(interval=1)
@@ -95,6 +122,15 @@ class SystemHealthMonitor:
 
     @staticmethod
     def _read_temperature(psutil_module) -> Optional[float]:
+        """
+        Read the primary CPU core or package temperature if supported by hardware sensors.
+
+        Args:
+            psutil_module: Imported psutil module reference.
+
+        Returns:
+            Current temperature in degrees Celsius or None if unavailable.
+        """
         try:
             sensors = psutil_module.sensors_temperatures()
             if not sensors:
@@ -108,6 +144,12 @@ class SystemHealthMonitor:
             return None
 
     def _check_thresholds(self, snap: HealthSnapshot) -> None:
+        """
+        Evaluate snapshot against configured critical thresholds and log warnings if exceeded.
+
+        Args:
+            snap: Recorded HealthSnapshot to evaluate.
+        """
         if snap.cpu_percent  >= self._cpu_thr:
             logger.warning("⚠️  CPU critical: %.1f%%", snap.cpu_percent)
         if snap.memory_percent >= self._mem_thr:
@@ -119,6 +161,12 @@ class SystemHealthMonitor:
 
     @staticmethod
     def _push_sse(snap: HealthSnapshot) -> None:
+        """
+        Push real-time health telemetry to dashboard subscribers via Server-Sent Events.
+
+        Args:
+            snap: HealthSnapshot containing metrics to broadcast.
+        """
         try:
             from dashboard.app import push_sse_event  # type: ignore
             push_sse_event({

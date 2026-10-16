@@ -2,13 +2,14 @@
 snapshot_saver.py — Detection Snapshot Saver
 =============================================
 Saves annotated JPEG snapshots for every confirmed detection.
-Snapshots are organised as:
-    logs/snapshots/<YYYY-MM-DD>/<camera_id>/<HHMMSSmmm>.jpg
 
-Annotation includes:
-  • Red bounding boxes with class + confidence labels
-  • Bearing overlay (top-left)
-  • UTC timestamp watermark (bottom-left)
+Workflow:
+  1. Triggered on confirmed drone detections by DroneDetector.
+  2. Renders tactical annotations (red bounding boxes, IDs, confidence, bearing).
+  3. Watermarks frame with timestamp and operational banners.
+  4. Automatically structures saved images into date-partitioned folders:
+     logs/snapshots/<YYYY-MM-DD>/<camera_id>/<HHMMSSmmm>.jpg
+  5. Returns absolute Path to the saved JPEG image for event logging and gallery display.
 """
 
 from __future__ import annotations
@@ -33,13 +34,19 @@ _FONT_BOLD = cv2.FONT_HERSHEY_DUPLEX
 
 class SnapshotSaver:
     """
-    Annotates frames and saves them to disk.
+    Annotates video frames with tactical bounding boxes and saves high-quality JPEGs to disk.
 
     Config keys (under 'logging'):
         snapshot_dir (str)  : root directory for snapshots
     """
 
     def __init__(self, config: dict) -> None:
+        """
+        Initialize the SnapshotSaver subsystem.
+
+        Args:
+            config (dict): Configuration dictionary containing 'logging' section.
+        """
         log_cfg = config.get("logging", {})
         self._root: Path = Path(log_cfg.get("snapshot_dir", "logs/snapshots"))
         self._root.mkdir(parents=True, exist_ok=True)
@@ -57,10 +64,16 @@ class SnapshotSaver:
         bearing_deg: Optional[float] = None,
     ) -> Path:
         """
-        Annotate `frame` and write to disk.
+        Annotate `frame` with target detections and write JPEG to disk.
+
+        Args:
+            frame (np.ndarray): Original image frame.
+            detections (List): List of active Detection objects to annotate.
+            camera_id (str): Camera identifier reporting the detection.
+            bearing_deg (Optional[float]): Computed bearing angle in degrees.
 
         Returns:
-            Absolute Path to the saved JPEG.
+            Path: Absolute Path to the saved JPEG snapshot file.
         """
         if bearing_deg is None and detections:
             cx = sum(d.center[0] for d in detections) / len(detections)
@@ -92,6 +105,17 @@ class SnapshotSaver:
         detections: List,
         bearing_deg: Optional[float],
     ) -> np.ndarray:
+        """
+        Render tactical overlays, bounding boxes, labels, and watermarks onto the frame.
+
+        Args:
+            frame (np.ndarray): Image array copy to annotate.
+            detections (List): Detections to draw onto the frame.
+            bearing_deg (Optional[float]): Bearing angle to display in banner.
+
+        Returns:
+            np.ndarray: Annotated image array.
+        """
         h, w = frame.shape[:2]
 
         # --- bounding boxes ---
@@ -133,6 +157,15 @@ class SnapshotSaver:
     # ──────────────────────────────────────────────────────────────
 
     def _build_path(self, camera_id: str) -> Path:
+        """
+        Construct standard date-partitioned file path for saving a snapshot.
+
+        Args:
+            camera_id (str): Camera identifier.
+
+        Returns:
+            Path: Constructed target Path for the snapshot image.
+        """
         now  = datetime.now(timezone.utc)
         date = now.strftime("%Y-%m-%d")
         ts   = now.strftime("%H%M%S%f")[:11]      # HHMMSSmmm
@@ -144,7 +177,15 @@ class SnapshotSaver:
 # ──────────────────────────────────────────────────────────────────
 
 def _bearing_to_cardinal(deg: float) -> str:
-    """Convert a horizontal bearing offset (−90…+90) to a compass word."""
+    """
+    Convert a horizontal bearing offset (-90 to +90) into a human-readable direction phrase.
+
+    Args:
+        deg (float): Horizontal bearing angle in degrees.
+
+    Returns:
+        str: Descriptive string (e.g., 'FAR LEFT', 'CENTRE', 'RIGHT').
+    """
     if   deg < -60: return "FAR LEFT"
     elif deg < -30: return "LEFT"
     elif deg < -10: return "SLIGHT LEFT"

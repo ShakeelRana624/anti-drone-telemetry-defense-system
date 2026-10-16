@@ -66,12 +66,14 @@ class TargetMetrics:
 
     @property
     def avg_confidence(self) -> float:
+        """Calculate arithmetic mean of historical detection confidence scores across sliding window."""
         if not self.confidence_history:
             return 0.0
         return float(sum(self.confidence_history) / len(self.confidence_history))
 
     @property
     def persistence_ratio(self) -> float:
+        """Calculate temporal persistence ratio (hits / total window frames) in rolling history."""
         if not self.hit_history:
             return 0.0
         return float(sum(1 for h in self.hit_history if h) / len(self.hit_history))
@@ -105,6 +107,17 @@ class DecisionEngine:
         target_cooldown_sec: float = 20.0,
         max_miss_frames: int = 15,
     ) -> None:
+        """
+        Initialize the DecisionEngine with multi-frame confirmation gates and cooldown thresholds.
+
+        Args:
+            min_consecutive_hits: Required consecutive frames of detection before locking target (default 8).
+            window_size: Sliding window size for persistence ratio check (default 12).
+            min_hits_in_window: Minimum positive sightings required within sliding window (default 7).
+            min_confidence: Minimum average detection confidence required for confirmation (default 0.35).
+            target_cooldown_sec: Post-alert cooldown period in seconds suppressing repeated alerts for same target.
+            max_miss_frames: Maximum missed frames before target is purged from memory.
+        """
         self.min_consecutive_hits = min_consecutive_hits
         self.window_size = window_size
         self.min_hits_in_window = min_hits_in_window
@@ -122,9 +135,18 @@ class DecisionEngine:
         camera_id: str = "primary",
     ) -> DecisionResult:
         """
-        Evaluate detections for the current frame across historical temporal windows.
-        
-        Returns DecisionResult containing only confirmed threats and telemetry.
+        Evaluate raw or tracked detections for the current video frame against historical persistence gates.
+        Separates unconfirmed candidates (1-7 frames) from confirmed locked threats (>= 8 frames),
+        manages state transitions, handles target miss decays with speed-burst grace periods,
+        and determines whether a global alarm trigger should fire.
+
+        Args:
+            detections: List of current candidate detections or active DeepSORT tracks.
+            camera_id: Camera stream identifier.
+
+        Returns:
+            DecisionResult: Encapsulated decision assessment including confirmed targets,
+                           candidate targets, alert trigger flag, and target states.
         """
         now = time.time()
         seen_ids = set()
@@ -265,6 +287,9 @@ class DecisionEngine:
         )
 
     def reset(self) -> None:
-        """Reset decision state."""
+        """
+        Purge all tracked targets, historical frame hit counters, and camera alert cooldown timestamps.
+        Resets decision engine state to clean baseline.
+        """
         self._targets.clear()
         self._camera_last_alert.clear()

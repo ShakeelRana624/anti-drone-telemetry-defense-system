@@ -4,13 +4,12 @@ event_logger.py — Timestamped Event Logger
 Writes structured JSON lines to a daily rotating log file AND
 maintains an in-memory ring buffer for the live dashboard.
 
-Each detection record includes:
-  - ISO-8601 UTC timestamp
-  - camera_id
-  - detection count
-  - per-detection details (class, confidence, bbox, center)
-  - bearing estimate
-  - path to saved snapshot image
+Workflow:
+  1. Receives confirmed detection events and system lifecycle events.
+  2. Formats events with UTC ISO-8601 timestamps and spatial parameters.
+  3. Appends records to a thread-safe in-memory ring buffer (for /api/recent).
+  4. Automatically pushes events to active Server-Sent Events (SSE) web subscribers.
+  5. Rotates log files daily (events_YYYY-MM-DD.jsonl) and purges files older than max_days.
 """
 
 from __future__ import annotations
@@ -37,6 +36,12 @@ class EventLogger:
     """
 
     def __init__(self, config: dict) -> None:
+        """
+        Initialize the EventLogger subsystem.
+
+        Args:
+            config (dict): Full system configuration dictionary containing 'logging' section.
+        """
         log_cfg = config.get("logging", {})
         self.log_dir: Path  = Path(log_cfg.get("event_log_dir", "logs/events"))
         self.max_days: int  = log_cfg.get("max_log_days", 30)
@@ -60,10 +65,20 @@ class EventLogger:
         camera_id: str,
         snapshot_path: Optional[Path] = None,
     ) -> None:
-        """Log a confirmed detection event."""
+        """
+        Log a confirmed multi-frame drone detection incident.
+
+        Args:
+            detections (List): List of confirmed Detection objects in the frame.
+            camera_id (str): Camera identifier reporting the detection.
+            snapshot_path (Optional[Path]): File path to the saved annotated snapshot JPEG.
+
+        Returns:
+            None
+        """
         from utils.bearing_calculator import BearingCalculator  # lazy to avoid circular
         # bearing is already computed upstream; we receive it via snapshot_path metadata
-        # We'll compute a simple centre-based bearing here for the log record.
+        # We compute a simple centre-based bearing here for the log record.
         bearing_deg: float = 0.0
         if detections:
             cx = sum((d.center[0] for d in detections), 0.0) / len(detections)
@@ -91,7 +106,16 @@ class EventLogger:
         self._write(record)
 
     def log_system(self, event_type: str, details: dict) -> None:
-        """Log a system-level event (startup, health warning, etc.)."""
+        """
+        Log a system-level lifecycle or operational event.
+
+        Args:
+            event_type (str): Category of event (e.g., 'startup', 'shutdown', 'health_warning').
+            details (dict): Additional event-specific key-value telemetry data.
+
+        Returns:
+            None
+        """
         record = {
             "event":     event_type,
             "timestamp": _utc_now(),
@@ -100,14 +124,31 @@ class EventLogger:
         self._write(record)
 
     def recent(self, n: int = 50) -> List[Dict[str, Any]]:
-        """Return up to `n` most recent events from the ring buffer."""
+        """
+        Retrieve recent in-memory events from the ring buffer.
+
+        Args:
+            n (int): Number of most recent records to return (default: 50).
+
+        Returns:
+            List[Dict[str, Any]]: Chronological list of recent event dictionaries.
+        """
         events = list(self._ring)
         return events[-n:]
 
     def close(self) -> None:
-        """Flush and close the current log file."""
+        """
+        Flush buffers and close the open log file stream.
+
+        Returns:
+            None
+        """
         if self._file:
-            self._file.close()
+            try:
+                self._file.flush()
+                self._file.close()
+            except Exception:
+                pass
             self._file = None
 
     # ──────────────────────────────────────────────────────────────
@@ -115,7 +156,15 @@ class EventLogger:
     # ──────────────────────────────────────────────────────────────
 
     def _write(self, record: Dict[str, Any]) -> None:
-        """Write to ring buffer + today's file; rotate if date changed."""
+        """
+        Internal write dispatcher: appends to ring buffer and writes to daily file.
+
+        Args:
+            record (Dict[str, Any]): Structured JSON event object.
+
+        Returns:
+            None
+        """
         self._ring.append(record)
         self._push_sse(record)
 
@@ -124,14 +173,24 @@ class EventLogger:
             self._open_today()
 
         try:
-            self._file.write(json.dumps(record, ensure_ascii=False) + "\n")
-            self._file.flush()
+            if self._file:
+                self._file.write(json.dumps(record, ensure_ascii=False) + "\n")
+                self._file.flush()
         except Exception as exc:
             logger.error("EventLogger write failed: %s", exc)
 
     def _open_today(self) -> None:
+        """
+        Rotate to or initialize today's JSONL event log file.
+
+        Returns:
+            None
+        """
         if self._file:
-            self._file.close()
+            try:
+                self._file.close()
+            except Exception:
+                pass
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         path  = self.log_dir / f"events_{today}.jsonl"
         self._file = open(path, "a", encoding="utf-8")
@@ -140,19 +199,32 @@ class EventLogger:
         self._purge_old_logs()
 
     def _purge_old_logs(self) -> None:
-        """Delete .jsonl files older than max_days."""
+        """
+        Scan log directory and remove files exceeding retention limit (max_days).
+
+        Returns:
+            None
+        """
         cutoff = datetime.now(timezone.utc).timestamp() - self.max_days * 86400
         for f in self.log_dir.glob("events_*.jsonl"):
-            if f.stat().st_mtime < cutoff:
-                try:
+            try:
+                if f.stat().st_mtime < cutoff:
                     f.unlink()
                     logger.info("EventLogger: purged old log %s", f.name)
-                except OSError:
-                    pass
+            except OSError:
+                pass
 
     @staticmethod
     def _push_sse(record: Dict[str, Any]) -> None:
-        """Forward the record to the live dashboard SSE stream."""
+        """
+        Forward the record to the live dashboard SSE stream if active.
+
+        Args:
+            record (Dict[str, Any]): Event record dictionary.
+
+        Returns:
+            None
+        """
         try:
             from dashboard.app import push_sse_event  # type: ignore
             push_sse_event(record)
@@ -161,4 +233,10 @@ class EventLogger:
 
 
 def _utc_now() -> str:
+    """
+    Generate an ISO-8601 UTC timestamp string with millisecond precision.
+
+    Returns:
+        str: Formatted UTC timestamp (e.g. '2026-10-16T13:30:00.123Z').
+    """
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"

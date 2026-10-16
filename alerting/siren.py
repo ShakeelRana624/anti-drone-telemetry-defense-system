@@ -25,6 +25,12 @@ class SirenController:
     """
 
     def __init__(self, config: dict) -> None:
+        """
+        Initialize the siren controller.
+
+        Args:
+            config: Alerting configuration dictionary with 'enabled', 'gpio_pin', and 'duration_seconds'.
+        """
         self._enabled:  bool = config.get("enabled",          True)
         self._pin:      int  = config.get("gpio_pin",         17)
         self._duration: int  = config.get("duration_seconds", 30)
@@ -38,17 +44,22 @@ class SirenController:
 
     @property
     def is_active(self) -> bool:
+        """Boolean indicating whether the siren alarm is currently sounding."""
         return self._is_active
 
     @property
     def remaining_seconds(self) -> int:
+        """Number of seconds remaining on the current active siren alarm cycle."""
         if not self._is_active:
             return 0
         elapsed = time.time() - self._active_start
         return max(0, int(self._duration - elapsed))
 
     def activate(self) -> None:
-        """Sound the siren for the configured duration (default 30s)."""
+        """
+        Sound the acoustic siren relay for the configured duration (default 30 seconds).
+        Blocks current worker thread until duration completes or early deactivation is requested.
+        """
         if not self._enabled:
             logger.debug("Siren disabled — skipped.")
             return
@@ -69,12 +80,18 @@ class SirenController:
                 logger.info("🔇 SIREN COMPLETED (30s elapsed)")
 
     def deactivate(self) -> None:
-        """Immediately silence the siren."""
+        """Immediately silence the siren and cancel any ongoing alarm cycle."""
         self._cancel_event.set()
         self._set_pin(False)
         self._is_active = False
 
     def get_status(self) -> dict:
+        """
+        Query current siren operational status and remaining blast time.
+
+        Returns:
+            dict: Dictionary containing enabled flag, pin, duration, is_active, and remaining_seconds.
+        """
         return {
             "enabled": self._enabled,
             "pin": self._pin,
@@ -86,6 +103,7 @@ class SirenController:
     # ── GPIO ──────────────────────────────────────────────────────
 
     def _setup_gpio(self) -> None:
+        """Initialize physical GPIO relay pin on Linux SBC (Raspberry Pi/Jetson); falls back to simulation."""
         try:
             import RPi.GPIO as GPIO  # type: ignore
             GPIO.setmode(GPIO.BCM)
@@ -98,12 +116,19 @@ class SirenController:
             logger.error("GPIO setup failed: %s", exc)
 
     def _set_pin(self, state: bool) -> None:
+        """
+        Set GPIO output pin voltage level.
+
+        Args:
+            state: True for HIGH (relay energized / siren active), False for LOW (silent).
+        """
         if self._gpio:
             self._gpio.output(self._pin, self._gpio.HIGH if state else self._gpio.LOW)
         else:
             logger.debug("[SIM] Siren %s", "ON" if state else "OFF")
 
     def __del__(self) -> None:
+        """Cleanup GPIO pins on object destruction if physical GPIO was acquired."""
         if self._gpio:
             try:
                 self._gpio.cleanup(self._pin)
@@ -114,7 +139,15 @@ class SirenController:
 _siren_instance: Optional[SirenController] = None
 
 def get_siren_controller(config: Optional[dict] = None) -> SirenController:
-    """Return the global SirenController singleton."""
+    """
+    Retrieve or initialize the global SirenController singleton instance.
+
+    Args:
+        config: Optional configuration dictionary.
+
+    Returns:
+        SirenController: Shared singleton instance.
+    """
     global _siren_instance
     if _siren_instance is None:
         if config is None:

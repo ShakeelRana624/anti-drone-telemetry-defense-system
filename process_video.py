@@ -68,7 +68,16 @@ CLR_HUD_BG     = (18, 12, 28)
 
 
 def find_input_video(default_path: Path) -> Optional[Path]:
-    """Find input video from default path or scan test_videos folder."""
+    """
+    Search for a valid input video file at the default path or discover any supported video file
+    (.mp4, .avi, .mov, .mkv) residing inside the 'test_videos' directory.
+
+    Args:
+        default_path: Initial candidate path to test for existence.
+
+    Returns:
+        Optional[Path]: Path to located video file if found, otherwise None.
+    """
     if default_path.exists() and default_path.is_file():
         return default_path
 
@@ -97,7 +106,22 @@ def process_video_file(
     drone_type: str = "generic_medium",
     drone_width_m: Optional[float] = None,
 ) -> None:
-    """Run full detection, tracking, decision, and True Compass Bearing pipeline on video file."""
+    """
+    Execute the complete end-to-end drone detection, tracking, bearing calculation,
+    distance/GPS estimation, multi-frame threat verification, and tactical HUD rendering on a video file.
+
+    Args:
+        input_path: Path to input video file.
+        output_path: Destination path for annotated MP4 video (default: output_videos/<stem>_detected.mp4).
+        model_path: Path to trained YOLO model weights (.onnx or .pt).
+        conf_thresh: Minimum confidence score for raw candidate detections.
+        slice_size: Pixel dimension for SAHI window slicing (e.g., 256).
+        camera_heading: Compass azimuth heading of camera optical axis in degrees (0=North, 90=East).
+        cam_lat: Geographic latitude of camera sensor in decimal degrees.
+        cam_lon: Geographic longitude of camera sensor in decimal degrees.
+        drone_type: Model key from DRONE_REFERENCE_SIZES for optical pinhole distance estimation.
+        drone_width_m: Optional manual override of drone diagonal physical dimension in metres.
+    """
     cam_card = BearingCalculator.degrees_to_cardinal(camera_heading)
     print("\n" + "=" * 65)
     print("🚁 OFFLINE VIDEO DRONE DETECTION & TRUE COMPASS BEARING")
@@ -358,7 +382,26 @@ def render_hud(
     w: int,
     h: int,
 ) -> np.ndarray:
-    """Render tactical overlay with bounding boxes, IDs, 8-frame lock status, and calculated angles."""
+    """
+    Render tactical HUD overlay on the video frame, including boresight crosshair, target bounding boxes,
+    corner brackets, bearing ray lines, 8-frame lock indicators, telemetry banners (bearing, ground distance,
+    slant range, altitude, speed, motion state, and GPS coordinates), and status headers/footers.
+
+    Args:
+        frame: Source BGR image frame (numpy.ndarray).
+        detections: List of current target detections or active DeepSORT tracks.
+        decision: DecisionEngine evaluation result containing threat states and confirmations.
+        bearing_calculator: Utility instance configured for relative angles and true compass bearings.
+        dist_estimator: Utility instance computing pinhole distances and WGS-84 Vincenty GPS coordinates.
+        frame_idx: Current frame index (1-based).
+        total_frames: Total number of frames in video file.
+        video_fps: Video frame rate.
+        w: Frame width in pixels.
+        h: Frame height in pixels.
+
+    Returns:
+        numpy.ndarray: Annotated BGR frame with tactical HUD overlays.
+    """
     target_states = decision.target_states if decision else {}
 
     # Center boresight (optical camera center 0.0 deg relative)
@@ -530,6 +573,10 @@ def render_hud(
 
 
 def main():
+    """
+    CLI entry point for offline video processing.
+    Parses command-line arguments, locates the target video file, and executes the processing pipeline.
+    """
     parser = argparse.ArgumentParser(description="Process uploaded video file with AI Drone Detection & Tracking")
     parser.add_argument(
         "--input",
