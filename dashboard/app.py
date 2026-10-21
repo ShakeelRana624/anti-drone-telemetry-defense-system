@@ -433,13 +433,21 @@ class DashboardApp:
                 import time
 
                 cam_mgr = get_ip_camera_manager()
+                from detection.live_inference import get_live_inference_engine
+                engine = get_live_inference_engine()
+
                 while True:
                     frame = cam_mgr.get_frame(camera_id)
-                    success, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 78])
+                    if frame is not None:
+                        processed_frame = engine.process_frame(frame, camera_id=camera_id)
+                    else:
+                        processed_frame = frame
+
+                    success, buffer = cv2.imencode(".jpg", processed_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
                     if success:
                         yield (b"--frame\r\n"
                                b"Content-Type: image/jpeg\r\n\r\n" + buffer.tobytes() + b"\r\n")
-                    time.sleep(0.06)  # ~16 fps smooth stream
+                    time.sleep(0.04)  # ~25 fps smooth stream
 
             return Response(
                 stream_with_context(gen_frames()),
@@ -844,57 +852,11 @@ def _generate_tactical_frame(camera_id: str, frame_idx: int) -> Any:
     cv2.line(img, (cx, cy - 20), (cx, cy - 8), accent_bgr, 1)
     cv2.line(img, (cx, cy + 8), (cx, cy + 20), accent_bgr, 1)
 
-    # Simulated drone movement (smooth Lissajous orbit)
-    t = frame_idx * 0.04
-    if not is_cam2:
-        dx = int(cx + 120 * math.sin(t) + 30 * math.cos(2 * t))
-        dy = int(cy - 40 + 50 * math.cos(t * 1.3))
-        drone_label = "TARGET #01 [QUADCOPTER]"
-        conf = "96.4%"
-        bearing = f"{(45.2 + 10 * math.sin(t)):.1f}°"
-        alt = f"{118 + int(12 * math.cos(t))}m"
-    else:
-        dx = int(cx - 100 * math.cos(t * 0.8) + 20 * math.sin(t))
-        dy = int(cy + 20 + 40 * math.sin(t * 1.1))
-        drone_label = "THERMAL SIGNATURE #02"
-        conf = "93.8%"
-        bearing = f"{(128.5 + 8 * math.cos(t)):.1f}°"
-        alt = f"{142 + int(15 * math.sin(t))}m"
-
-    # Draw simulated Drone Drone Silhouette & Bounding Box
-    box_w, box_h = 76, 52
-    bx1 = max(10, dx - box_w // 2)
-    by1 = max(10, dy - box_h // 2)
-    bx2 = min(width - 10, bx1 + box_w)
-    by2 = min(height - 10, by1 + box_h)
-
-    # Corner brackets instead of full box for modern tactical look
-    corner_len = 14
-    c_color = accent_bgr
-    # Top-left
-    cv2.line(img, (bx1, by1), (bx1 + corner_len, by1), c_color, 2)
-    cv2.line(img, (bx1, by1), (bx1, by1 + corner_len), c_color, 2)
-    # Top-right
-    cv2.line(img, (bx2, by1), (bx2 - corner_len, by1), c_color, 2)
-    cv2.line(img, (bx2, by1), (bx2, by1 + corner_len), c_color, 2)
-    # Bottom-left
-    cv2.line(img, (bx1, by2), (bx1 + corner_len, by2), c_color, 2)
-    cv2.line(img, (bx1, by2), (bx1, by2 - corner_len), c_color, 2)
-    # Bottom-right
-    cv2.line(img, (bx2, by2), (bx2 - corner_len, by2), c_color, 2)
-    cv2.line(img, (bx2, by2), (bx2, by2 - corner_len), c_color, 2)
-
-    # Center target lock reticle
-    cv2.drawMarker(img, (dx, dy), crimson_bgr, cv2.MARKER_CROSS, 16, 1)
-
-    # Label box
-    cv2.rectangle(img, (bx1, by1 - 18), (bx1 + 160, by1), (20, 10, 40), -1)
-    cv2.putText(img, f"{drone_label}", (bx1 + 4, by1 - 6),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.34, accent_bgr, 1, cv2.LINE_AA)
-    cv2.putText(img, f"CONF: {conf} | BRG: {bearing}", (bx1, by2 + 14),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.32, (200, 200, 240), 1, cv2.LINE_AA)
-    cv2.putText(img, f"ALT: {alt} | RNG: 320m", (bx1, by2 + 26),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.32, (180, 180, 210), 1, cv2.LINE_AA)
+    # Clean boresight status indicator (NO FAKE TARGETS)
+    cv2.putText(img, "AIRSPACE SECURE - OPTICAL SURVEILLANCE ACTIVE", (cx - 190, cy + 70),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.40, (180, 180, 210), 1, cv2.LINE_AA)
+    cv2.putText(img, "AWAITING AERIAL TARGET DETECTION", (cx - 130, cy + 95),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.35, (120, 120, 150), 1, cv2.LINE_AA)
 
     # Top overlay header
     cam_name = "CAM-01 [NORTH PERIMETER - OPTICAL]" if not is_cam2 else "CAM-02 [EAST SECTOR - FLIR THERMAL]"

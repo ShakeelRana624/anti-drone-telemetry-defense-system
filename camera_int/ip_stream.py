@@ -118,13 +118,27 @@ class IPCameraStream:
         if custom:
             return custom
 
-        if mode == "usb":
+        if mode in ("usb", "webcam"):
             try:
                 return int(cfg.get("ip", 0))
-            except ValueError:
+            except (ValueError, TypeError):
                 return 0
 
+        if mode in ("file", "video"):
+            fpath = cfg.get("file_path") or cfg.get("ip") or "test_videos/input.mp4"
+            return str(fpath)
+
         ip = (cfg.get("ip") or "").strip()
+        # Direct video file support
+        if any(ip.lower().endswith(ext) for ext in [".mp4", ".avi", ".mov", ".mkv"]):
+            return ip
+
+        # Auto fallback to test video if input.mp4 exists and IP is default placeholder
+        from pathlib import Path
+        test_vid = Path(__file__).resolve().parent.parent / "test_videos" / "input.mp4"
+        if ip in ("192.168.1.101", "localhost", "127.0.0.1", "") and test_vid.exists():
+            return str(test_vid)
+
         port = cfg.get("port", 554)
         user = (cfg.get("username") or "").strip()
         pwd = (cfg.get("password") or "").strip()
@@ -222,13 +236,13 @@ class IPCameraStream:
                 if now - last_reconnect_attempt > reconnect_delay:
                     last_reconnect_attempt = now
                     try:
-                        # Fast probe to prevent OpenCV 30-second network hang on unreachable IP
                         cam_ip = self.config.get("ip", "").strip()
                         cam_port = int(self.config.get("port", 554))
-                        is_usb = self.config.get("connection_mode") == "usb"
+                        is_usb = self.config.get("connection_mode") in ("usb", "webcam") or isinstance(self.source, int)
+                        is_file = isinstance(self.source, str) and any(str(self.source).lower().endswith(ext) for ext in [".mp4", ".avi", ".mov", ".mkv"])
                         is_reachable = True
 
-                        if not is_usb and cam_ip:
+                        if not is_usb and not is_file and cam_ip and cam_ip not in ("192.168.1.101", "localhost", "127.0.0.1", ""):
                             is_reachable, _, _ = probe_ip_camera(cam_ip, cam_port, timeout_sec=0.8)
 
                         if is_reachable:
@@ -248,9 +262,15 @@ class IPCameraStream:
                         self.healthy = False
                         self._cap = None
             else:
-                # Read physical frame
+                # Read physical or video frame
                 try:
                     ret, frame = self._cap.read()
+                    # Auto-loop video files for continuous testing
+                    is_file = isinstance(self.source, str) and any(str(self.source).lower().endswith(ext) for ext in [".mp4", ".avi", ".mov", ".mkv"])
+                    if (not ret or frame is None) and is_file:
+                        self._cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        ret, frame = self._cap.read()
+
                     if ret and frame is not None:
                         self.healthy = True
                         fps_counter += 1
@@ -316,37 +336,9 @@ class IPCameraStream:
         cv2.line(img, (cx, cy - 20), (cx, cy - 8), accent_bgr, 1)
         cv2.line(img, (cx, cy + 8), (cx, cy + 20), accent_bgr, 1)
 
-        # Smooth target simulation
-        t = frame_idx * 0.04
-        if not is_thermal:
-            dx = int(cx + 120 * math.sin(t) + 30 * math.cos(2 * t))
-            dy = int(cy - 40 + 50 * math.cos(t * 1.3))
-            label = "TARGET #01 [QUADCOPTER]"
-            conf = "96.8%"
-        else:
-            dx = int(cx - 100 * math.cos(t * 0.8) + 20 * math.sin(t))
-            dy = int(cy + 20 + 40 * math.sin(t * 1.1))
-            label = "THERMAL FLIR TARGET #02"
-            conf = "94.2%"
-
-        # Bounding box brackets
-        bw, bh = 76, 52
-        bx1, by1 = max(10, dx - bw // 2), max(10, dy - bh // 2)
-        bx2, by2 = min(w - 10, bx1 + bw), min(h - 10, by1 + bh)
-        k = 12
-        cv2.line(img, (bx1, by1), (bx1 + k, by1), accent_bgr, 2)
-        cv2.line(img, (bx1, by1), (bx1, by1 + k), accent_bgr, 2)
-        cv2.line(img, (bx2, by1), (bx2 - k, by1), accent_bgr, 2)
-        cv2.line(img, (bx2, by1), (bx2, by1 + k), accent_bgr, 2)
-        cv2.line(img, (bx1, by2), (bx1 + k, by2), accent_bgr, 2)
-        cv2.line(img, (bx1, by2), (bx1, by2 - k), accent_bgr, 2)
-        cv2.line(img, (bx2, by2), (bx2 - k, by2), accent_bgr, 2)
-        cv2.line(img, (bx2, by2), (bx2 - k, by2), accent_bgr, 2)
-
-        # Target label
-        cv2.rectangle(img, (bx1, by1 - 18), (bx1 + 160, by1), (20, 10, 40), -1)
-        cv2.putText(img, label, (bx1 + 4, by1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.34, accent_bgr, 1, cv2.LINE_AA)
-        cv2.putText(img, f"CONF: {conf} | BRG: {self.azimuth_deg:.1f} DEG", (bx1, by2 + 14), cv2.FONT_HERSHEY_SIMPLEX, 0.32, (200, 200, 240), 1, cv2.LINE_AA)
+        # Clean tactical surveillance standby status (NO FAKE TARGETS)
+        cv2.putText(img, "AIRSPACE SECURE - OPTICAL SURVEILLANCE ACTIVE", (cx - 190, cy + 70), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (180, 180, 210), 1, cv2.LINE_AA)
+        cv2.putText(img, "AWAITING AERIAL TARGET DETECTION", (cx - 130, cy + 95), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (120, 120, 150), 1, cv2.LINE_AA)
 
         # Top Bar: Camera Label & Status
         status_text = "LIVE [IP CONNECTED]" if self.healthy else "STANDBY [SIMULATOR MODE]"
