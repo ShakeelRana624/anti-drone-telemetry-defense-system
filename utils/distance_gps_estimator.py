@@ -166,6 +166,7 @@ class DistanceGPSEstimator:
 
         self._ema_alpha = float(config.get("distance_ema_alpha", _EMA_ALPHA))
         self._ema_state: Dict[str, float] = {}
+        self._eta_state: Dict[str, Optional[float]] = {}
         # track_id -> deque of (timestamp, x_m, y_m, z_m, slant_distance_m, cx_norm, cy_norm, w_norm)
         self._track_history: Dict[str, Deque[Tuple[float, ...]]] = {}
 
@@ -207,9 +208,11 @@ class DistanceGPSEstimator:
         if track_id is None:
             self._ema_state.clear()
             self._track_history.clear()
+            self._eta_state.clear()
         else:
             self._ema_state.pop(str(track_id), None)
             self._track_history.pop(str(track_id), None)
+            self._eta_state.pop(str(track_id), None)
 
     def estimate(
         self,
@@ -367,6 +370,90 @@ class DistanceGPSEstimator:
                 else:
                     motion_state = "CROSSING"
                     motion_label = "TRANSIT (CROSSING)"
+        # ── Stage D: Time to Base / Camera Intercept Estimation (ETA) ─────────
+        # Camera is mounted at Base Station origin (0, 0, 0).
+        # When drone approaches, calculate time remaining until arrival at camera base.
+        closing_speed_mps = 0.0
+        closing_speed_kmh = 0.0
+        eta_seconds: Optional[float] = None
+        eta_str = "ETA: N/A"
+        time_to_base_str = "TIME TO BASE: N/A"
+
+        if len(hist) >= 2 and dt >= 0.03:
+            # 3D Cartesian velocity vector towards base origin (0, 0, 0)
+            if slant_m > 1.0:
+                v_cart_approach = - (x_pos * dx + y_pos * dy + z_pos * dz) / (slant_m * dt)
+            else:
+                v_cart_approach = 0.0
+
+            # Determine closing speed towards camera base
+            close_candidates = []
+            if radial_speed_mps < -0.2:
+                close_candidates.append(-radial_speed_mps)
+            if v_cart_approach > 0.3:
+                close_candidates.append(v_cart_approach)
+            if r_scale > 0.05 and slant_m > 0:
+                close_candidates.append(r_scale * slant_m)
+            if motion_state == "INBOUND" and speed_mps > 0.5:
+                close_candidates.append(speed_mps * 0.75)
+
+            if close_candidates:
+                closing_speed_mps = round(max(close_candidates), 1)
+                closing_speed_kmh = round(closing_speed_mps * 3.6, 1)
+
+            # Check arrival proximity
+            if slant_m <= 3.0:
+                eta_seconds = 0.0
+                eta_str = "0.0s [AT BASE]"
+                time_to_base_str = "TIME TO BASE: ARRIVED (<3m)"
+            elif motion_state == "INBOUND" or (closing_speed_mps >= 0.8 and motion_state != "OUTBOUND"):
+                raw_eta = slant_m / max(0.5, closing_speed_mps)
+                # Exponential moving average filter on ETA to stabilize countdown
+                if tid in self._eta_state and self._eta_state[tid] is not None:
+                    prev_eta = self._eta_state[tid]
+                    eta_seconds = round(0.35 * raw_eta + 0.65 * max(0.0, prev_eta - dt), 1)
+                else:
+                    eta_seconds = round(raw_eta, 1)
+                self._eta_state[tid] = eta_seconds
+
+                if eta_seconds < 60.0:
+                    time_fmt = f"{eta_seconds:.1f}s"
+                else:
+                    mins = int(eta_seconds // 60)
+                    secs = int(eta_seconds % 60)
+                    time_fmt = f"{mins}m {secs}s"
+
+                eta_str = f"ETA: {time_fmt}"
+                time_to_base_str = f"TIME TO BASE: {time_fmt} ({closing_speed_kmh:.1f} km/h)"
+            elif motion_state == "HOVERING":
+                self._eta_state[tid] = None
+                eta_str = "ETA: N/A [HOVER]"
+                time_to_base_str = "TIME TO BASE: N/A (STATIONARY)"
+            elif motion_state == "OUTBOUND":
+                self._eta_state[tid] = None
+                eta_str = "ETA: N/A [RECEDING]"
+                time_to_base_str = "TIME TO BASE: N/A (RECEDING)"
+            else:  # CROSSING
+                self._eta_state[tid] = None
+                if closing_speed_mps >= 1.0:
+                    cross_eta = round(slant_m / closing_speed_mps, 1)
+                    if cross_eta < 60:
+                        t_str = f"{cross_eta:.1f}s"
+                    else:
+                        t_str = f"{int(cross_eta//60)}m {int(cross_eta%60)}s"
+                    eta_str = f"ETA: ~{t_str} [CROSS]"
+                    time_to_base_str = f"TIME TO BASE: ~{t_str} (LATERAL TRANSIT)"
+                else:
+                    eta_str = "ETA: N/A [CROSSING]"
+                    time_to_base_str = "TIME TO BASE: N/A (CROSSING)"
+        else:
+            if slant_m <= 3.0:
+                eta_seconds = 0.0
+                eta_str = "0.0s [AT BASE]"
+                time_to_base_str = "TIME TO BASE: ARRIVED (<3m)"
+            else:
+                eta_str = "ETA: CALCULATING..."
+                time_to_base_str = "TIME TO BASE: CALCULATING..."
 
         speed_str = f"SPD: {speed_kmh:.1f} km/h ({speed_mps:.1f} m/s) | {motion_label}"
 
@@ -383,6 +470,11 @@ class DistanceGPSEstimator:
             "radial_speed_mps":  radial_speed_mps,
             "motion_state":      motion_state,
             "motion_label":      motion_label,
+            "closing_speed_mps": closing_speed_mps,
+            "closing_speed_kmh": closing_speed_kmh,
+            "eta_seconds":       eta_seconds,
+            "eta_str":           eta_str,
+            "time_to_base_str":  time_to_base_str,
             "speed_str":         speed_str,
             "bbox_width_px":     bbox_width_px,
             "bbox_height_px":    bbox_height_px,

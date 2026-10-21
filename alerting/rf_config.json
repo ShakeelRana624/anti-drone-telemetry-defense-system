@@ -1,0 +1,59 @@
+{
+  "port": "COM3",
+  "baud_rate": 9600,
+  "channel": 5,
+  "frequency_mhz": 433.05,
+  "prerecorded_message": "TACTICAL ALERT: Hostile aerial drone detected at sector {sector}, bearing {bearing} deg. All 5 units initiate combat air surveillance.",
+  "units": [
+    {
+      "id": "RF-01",
+      "name": "Perimeter Guard Post Alpha",
+      "callsign": "VANGUARD-1",
+      "address": "0x01",
+      "channel": 5,
+      "frequency_mhz": 433.05,
+      "status": "ONLINE",
+      "role": "Static Sentry Guard"
+    },
+    {
+      "id": "RF-02",
+      "name": "Quick Reaction Force (QRF)",
+      "callsign": "STRIKER-2",
+      "address": "0x02",
+      "channel": 5,
+      "frequency_mhz": 433.05,
+      "status": "ONLINE",
+      "role": "Rapid Response Mobile Unit"
+    },
+    {
+      "id": "RF-03",
+      "name": "Tactical Operations Command",
+      "callsign": "OVERLORD-HQ",
+      "address": "0x03",
+      "channel": 5,
+      "frequency_mhz": 433.05,
+      "status": "ONLINE",
+      "role": "Command Center / Intel Desk"
+    },
+    {
+      "id": "RF-04",
+      "name": "Air Defense & Interceptor Post",
+      "callsign": "SHIELD-4",
+      "address": "0x04",
+      "channel": 5,
+      "frequency_mhz": 433.05,
+      "status": "ONLINE",
+      "role": "Drone Jammer & Interceptor Team"
+    },
+    {
+      "id": "RF-05",
+      "name": "Mobile Patrol Rover Team",
+      "callsign": "HAWK-5",
+      "address": "0x05",
+      "channel": 5,
+      "frequency_mhz": 433.05,
+      "status": "ONLINE",
+      "role": "Perimeter Patrol Vehicle"
+    }
+  ]
+}

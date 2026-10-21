@@ -62,13 +62,7 @@ cameras:
     source: 0                              # Device index or RTSP URL
     fps: 25
     resolution: [1280, 720]
-    label: "Camera 1 — Primary"
-
-  secondary:
-    source: 1
-    fps: 25
-    resolution: [1280, 720]
-    label: "Camera 2 — Secondary"
+    label: "Camera 1 — Primary Optical HD"
 
 # ─────────────────────────────────────────────────────────────────
 # Alerting

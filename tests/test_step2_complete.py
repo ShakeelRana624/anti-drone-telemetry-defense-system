@@ -124,6 +124,24 @@ def test_step2_complete() -> None:
     print(f"  -> {s}")
     assert s == PASS
 
+    # T9: Time to Base / Camera Intercept Estimation (ETA)
+    print(f"\nTest 9 - Time to Base / Camera Intercept Estimation (ETA):")
+    est_eta = DistanceGPSEstimator(cfg)
+    # Sample 1: Drone at 100m, t=0.0s (bbox width = 4.5px)
+    px_100m = (0.590 * est_eta._focal_px) / 100.0
+    r_t0 = est_eta.estimate(px_100m, px_100m*0.8, 0.0, 90.0, "tgt_inbound", timestamp=1000.0)
+
+    # Sample 2: Drone moved to 80m in 1.0s (speed = 20 m/s closing in)
+    px_80m = (0.590 * est_eta._focal_px) / 80.0
+    r_t1 = est_eta.estimate(px_80m, px_80m*0.8, 0.0, 90.0, "tgt_inbound", timestamp=1001.0)
+
+    print(f"  Inbound Drone: state={r_t1['motion_state']} | speed={r_t1['speed_kmh']} km/h | closing={r_t1['closing_speed_kmh']} km/h")
+    print(f"  ETA: {r_t1['eta_str']} | {r_t1['time_to_base_str']}")
+    eta_valid = r_t1["eta_seconds"] is not None and r_t1["eta_seconds"] > 0 and r_t1["motion_state"] == "INBOUND"
+    s = PASS if eta_valid else FAIL
+    print(f"  -> {s}")
+    assert s == PASS
+
     print("\n" + "="*68)
     print("ALL STEP 2 TESTS PASSED SUCCESSFULLY!")
     print("="*68)

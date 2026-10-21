@@ -52,7 +52,7 @@
       <div class="nav-tabs" role="tablist">
         <button class="tab-btn active" data-tab="tab-live" role="tab">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>
-          Dual Cameras & Live Feeds
+          Tactical Camera &amp; Live Feed
         </button>
         <button class="tab-btn" data-tab="tab-analytics" role="tab">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18 9l-5 5-4-4-3 3"/></svg>
@@ -130,12 +130,12 @@
 
       <div class="kpi-card">
         <div class="kpi-card__header">
-          <span class="kpi-card__title">Active Cameras</span>
+          <span class="kpi-card__title">Active Camera</span>
           <div class="kpi-card__icon">📹</div>
         </div>
-        <div class="kpi-card__value" id="kpi-cameras">2 / 2</div>
+        <div class="kpi-card__value" id="kpi-cameras">1 / 1</div>
         <div class="kpi-card__sub">
-          Cam 01 (Optical) &amp; Cam 02 (Thermal)
+          Cam 01 (Primary Optical HD 1080p)
         </div>
       </div>
 
@@ -167,29 +167,44 @@
     <!-- ═════════════════════════════════════════════════════════ -->
     <div class="tab-content active" id="tab-live">
       
-      <!-- Dual Camera Feeds -->
-      <section class="camera-section">
+      <!-- ═══════════ TACTICAL AIRSPACE C2: CAMERA (LEFT) & RADAR (RIGHT) ═══════════ -->
+      <section class="c2-airspace-section">
         <div class="section-header">
-          <h2 class="section-title">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-            Multi-Sensor Dual Camera Feeds (Real-Time 2-Cam Surveillance)
-          </h2>
+          <div>
+            <h2 class="section-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/><path d="M12 12l7-7"/></svg>
+              Tactical Airspace Command &bull; Live Optical Feed (Left) &amp; PPI Radar Scope (Right)
+            </h2>
+            <p style="font-size:0.75rem; color:var(--color-muted); margin-top:0.2rem;">
+              Synchronized Dual-Modality C2: Real-Time Boresight Optical Video + 360° PPI Airspace Radar Sweep.
+            </p>
+          </div>
           <div class="ctrl-btn-group">
             <button class="ctrl-btn active" id="btn-toggle-hud" onclick="toggleHUD()">
-              <span>🎯</span> HUD Overlay: ON
+              <span>🎯</span> HUD: ON
+            </button>
+            <button class="ctrl-btn" id="btn-radar-sweep-toggle" onclick="toggleRadarSweep()">
+              <span>🔄</span> Sweep: ON
+            </button>
+            <button class="ctrl-btn" onclick="simulateHostileDroneFlight()">
+              <span>🚨</span> Simulate Incursion (Demo)
+            </button>
+            <button class="ctrl-btn" onclick="clearLiveTelemetryAndRadar()">
+              <span>🗑️</span> Clear
             </button>
             <button class="ctrl-btn" onclick="triggerTestAlert()">
-              <span>🔔</span> Test Alert Broadcast
+              <span>🔔</span> Test Alert
             </button>
           </div>
         </div>
 
-        <div class="cameras-grid">
-          <!-- Camera 01: North Perimeter -->
+        <!-- 2-Column Split: Left = Camera Feed, Right = Radar Scope -->
+        <div class="c2-split-grid">
+          <!-- Left: Primary Tactical Camera Feed -->
           <div class="camera-feed-card" id="cam-card-1">
             <div class="camera-feed-card__header">
               <div class="camera-info">
-                <span class="camera-badge">CAM 01</span>
+                <span class="camera-badge">CAM 01 &bull; PRIMARY</span>
                 <span class="camera-name">North Perimeter — Optical HD 1080p</span>
               </div>
               <div class="camera-meta">
@@ -211,10 +226,10 @@
                 <div class="hud-reticle"></div>
                 <div class="hud-badge-rec">
                   <span class="rec-pulse"></span>
-                  LIVE REC
+                  LIVE REC &bull; AIRSPACE SURVEILLANCE
                 </div>
                 <div class="hud-telemetry">
-                  AZIMUTH: 045.2° | ELEV: 18.4° | RNG: 320m
+                  AZIMUTH: 045.2° | ELEV: 18.4° | RNG: 320m | TRUE COMPASS: 045.2° (NE)
                 </div>
               </div>
             </div>
@@ -222,130 +237,12 @@
             <div class="camera-controls-bar">
               <div class="ctrl-btn-group">
                 <button class="ctrl-btn" onclick="captureSnapshot('cam1')">📷 Snap</button>
-                <button class="ctrl-btn active">Optical HD</button>
+                <button class="ctrl-btn active">Optical HD 1080p</button>
                 <button class="ctrl-btn" onclick="toggleNightFilter('cam1')">🌙 Low-Light</button>
               </div>
               <div class="camera-meta">
                 <span>LATENCY: 12ms</span>
               </div>
-            </div>
-          </div>
-
-          <!-- Camera 02: East Sector Thermal -->
-          <div class="camera-feed-card" id="cam-card-2">
-            <div class="camera-feed-card__header">
-              <div class="camera-info">
-                <span class="camera-badge" style="background:#9A1E23;">CAM 02</span>
-                <span class="camera-name">East Sector — Thermal / FLIR Long-Wave</span>
-              </div>
-              <div class="camera-meta">
-                <span class="meta-pill">25.0 FPS</span>
-                <span class="meta-pill">IR FLIR</span>
-                <span class="status-dot"></span>
-              </div>
-            </div>
-
-            <div class="camera-viewport">
-              <img class="camera-stream-img" src="/api/video_feed/secondary" alt="Camera 02 Live Stream" loading="eager"/>
-
-              <!-- Tactical HUD Overlay -->
-              <div class="tactical-hud" id="hud-cam2">
-                <div class="hud-corner hud-corner--tl"></div>
-                <div class="hud-corner hud-corner--tr"></div>
-                <div class="hud-corner hud-corner--bl"></div>
-                <div class="hud-corner hud-corner--br"></div>
-                <div class="hud-reticle"></div>
-                <div class="hud-badge-rec">
-                  <span class="rec-pulse"></span>
-                  THERMAL REC
-                </div>
-                <div class="hud-telemetry">
-                  AZIMUTH: 128.5° | FLIR TEMP: 32.4°C | TRK: CONFIRMED
-                </div>
-              </div>
-            </div>
-
-            <div class="camera-controls-bar">
-              <div class="ctrl-btn-group">
-                <button class="ctrl-btn" onclick="captureSnapshot('cam2')">📷 Snap</button>
-                <button class="ctrl-btn active">Thermal FLIR</button>
-                <button class="ctrl-btn" onclick="toggleNightFilter('cam2')">🔥 Ironbow</button>
-              </div>
-              <div class="camera-meta">
-                <span>LATENCY: 14ms</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ═══════════ REAL-TIME TELEMETRY & TACTICAL AIRSPACE RADAR ═══════════ -->
-      <section class="telemetry-radar-section">
-        <div class="section-header">
-          <div>
-            <h2 class="section-title">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/><path d="M12 12l7-7"/></svg>
-              Live Aerial Target Telemetry &amp; Tactical PPI Airspace Radar
-            </h2>
-            <p style="font-size:0.75rem; color:var(--color-muted); margin-top:0.2rem;">
-              Direct Real-Time Kinematics: True Compass Bearing, Slant Distance, Altitude, Ground Range &amp; WGS-84 Geolocation.
-            </p>
-          </div>
-          <div class="ctrl-btn-group">
-            <button class="ctrl-btn" id="btn-radar-sweep-toggle" onclick="toggleRadarSweep()">
-              <span>🔄</span> Sweep: ON
-            </button>
-            <button class="ctrl-btn" onclick="simulateHostileDroneFlight()">
-              <span>🚨</span> Simulate Incursion (Demo)
-            </button>
-            <button class="ctrl-btn" onclick="clearLiveTelemetryAndRadar()">
-              <span>🗑️</span> Clear
-            </button>
-          </div>
-        </div>
-
-        <div class="telemetry-radar-grid">
-          <!-- Left: Real-Time Telemetry Table -->
-          <div class="telemetry-card">
-            <div class="telemetry-card__header">
-              <div class="telemetry-card__title">
-                <span>🎯</span> Active Target Telemetry Feed
-              </div>
-              <div class="target-count-badge" id="telemetry-target-count-badge">
-                <span class="status-dot"></span> <span id="telemetry-count-text">0 TARGETS LOCKED</span>
-              </div>
-            </div>
-
-            <div class="telemetry-table-wrapper">
-              <table class="telemetry-table" id="telemetry-table">
-                <thead>
-                  <tr>
-                    <th>Target ID</th>
-                    <th>Sensor / Cam</th>
-                    <th>Bearing (Deg / Dir)</th>
-                    <th>Distance (3D)</th>
-                    <th>GND Range</th>
-                    <th>Altitude (Z)</th>
-                    <th>Speed & Velocity</th>
-                    <th>Flight Motion</th>
-                    <th>WGS-84 Drone GPS</th>
-                    <th>Confidence / Lock</th>
-                    <th>Last Detect</th>
-                  </tr>
-                </thead>
-                <tbody id="telemetry-table-body">
-                  <tr id="telemetry-empty-row">
-                    <td colspan="11" class="telemetry-empty-row">
-                      📡 Airspace clear. Dual camera optical/thermal sensors scanning for targets...
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.6rem; font-size:0.7rem; color:var(--color-dim);">
-              <span>* Pinhole model + Geodesic Vincenty Direct Projection (WGS-84 Ellipsoid)</span>
-              <span>Coordinates refreshed on every confirmed detection</span>
             </div>
           </div>
 
@@ -403,6 +300,51 @@
             </div>
           </div>
         </div>
+
+        <!-- Full-Width Active Target Telemetry Feed Table -->
+        <div class="telemetry-card telemetry-card--full" style="margin-top: 1.25rem;">
+          <div class="telemetry-card__header">
+            <div class="telemetry-card__title">
+              <span>🎯</span> Active Target Telemetry Feed
+            </div>
+            <div class="target-count-badge" id="telemetry-target-count-badge">
+              <span class="status-dot"></span> <span id="telemetry-count-text">0 TARGETS LOCKED</span>
+            </div>
+          </div>
+
+          <div class="telemetry-table-wrapper">
+            <table class="telemetry-table" id="telemetry-table">
+              <thead>
+                <tr>
+                  <th>Target ID</th>
+                  <th>Sensor / Cam</th>
+                  <th>Bearing (Deg / Dir)</th>
+                  <th>Distance (3D)</th>
+                  <th>GND Range</th>
+                  <th>Altitude (Z)</th>
+                  <th>Speed &amp; Velocity</th>
+                  <th>Flight Motion</th>
+                  <th>ETA to Base</th>
+                  <th>WGS-84 Drone GPS</th>
+                  <th>Confidence / Lock</th>
+                  <th>Last Detect</th>
+                </tr>
+              </thead>
+              <tbody id="telemetry-table-body">
+                <tr id="telemetry-empty-row">
+                  <td colspan="12" class="telemetry-empty-row">
+                    📡 Airspace clear. Camera optical sensor and tactical radar scanning for targets...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.6rem; font-size:0.7rem; color:var(--color-dim);">
+            <span>* Pinhole model + Geodesic Vincenty Direct Projection (WGS-84 Ellipsoid)</span>
+            <span>Coordinates refreshed on every confirmed detection</span>
+          </div>
+        </div>
       </section>
 
       <!-- Tactical Lower Grid: Real-Time Event Log & Health -->
@@ -431,7 +373,7 @@
             <div class="event-item">
               <span class="event-item__time">21:18:50</span>
               <span class="event-badge event-badge--detect">DETECT</span>
-              <span class="event-item__text">Cam 02 (Thermal): High-speed micro-FPV drone tracked across East Sector</span>
+              <span class="event-item__text">Cam 01: High-speed micro-FPV drone tracked across North-East Sector</span>
             </div>
             <div class="event-item">
               <span class="event-item__time">21:05:12</span>
@@ -529,11 +471,9 @@
         </div>
 
         <div class="filter-group">
-          <span class="filter-label">Sensor Source:</span>
+          <span class="filter-label">Active Sensor:</span>
           <div class="pill-group">
-            <button class="pill-btn active" onclick="filterCameraCharts('all', this)">Both Cameras</button>
-            <button class="pill-btn" onclick="filterCameraCharts('primary', this)">Cam 01 (Optical)</button>
-            <button class="pill-btn" onclick="filterCameraCharts('secondary', this)">Cam 02 (Thermal)</button>
+            <button class="pill-btn active" onclick="filterCameraCharts('primary', this)">Cam 01 (Optical HD)</button>
           </div>
         </div>
 
@@ -549,8 +489,8 @@
         <div class="chart-card chart-card--full">
           <div class="chart-card__header">
             <div>
-              <h3 class="chart-card__title" id="main-chart-title">Weekly Aerial Incursion Trajectory (Camera 1 vs Camera 2)</h3>
-              <p class="chart-card__subtitle">Interactive Plotly multi-sensor line &amp; area breakdown with confidence intervals</p>
+              <h3 class="chart-card__title" id="main-chart-title">Weekly Aerial Incursion Trajectory (Cam 01 Optical HD)</h3>
+              <p class="chart-card__subtitle">Interactive Plotly optical sensor incursion timeline &amp; confidence analytics</p>
             </div>
             <span class="meta-pill" style="color:var(--color-accent);">PLOTLY.JS INTERACTIVE</span>
           </div>
@@ -629,9 +569,7 @@
           <div class="control-field">
             <label for="report-camera-select">Sensor Coverage</label>
             <select class="control-select" id="report-camera-select">
-              <option value="all" selected>All Sensors (Cam 01 Optical + Cam 02 Thermal)</option>
-              <option value="primary">Primary Sensor Only (Cam 01 North)</option>
-              <option value="secondary">Secondary Sensor Only (Cam 02 East Thermal)</option>
+              <option value="primary" selected>Cam 01 (Primary Optical HD 1080p)</option>
             </select>
           </div>
 
@@ -675,7 +613,7 @@
               </svg>
               <div class="report-title-block">
                 <h1 id="rep-title">Weekly Tactical Drone Activity Audit</h1>
-                <p id="rep-date-range">Coverage Window: 27 Sep 2026 – 03 Oct 2026 &bull; Scope: Dual Camera Multi-Sensor</p>
+                <p id="rep-date-range">Coverage Window: 27 Sep 2026 – 03 Oct 2026 &bull; Scope: Cam 01 Optical HD Surveillance</p>
               </div>
             </div>
             <div class="report-stamp">
@@ -795,10 +733,7 @@
       <!-- Camera Selector Tabs -->
       <div class="camera-select-tabs">
         <button class="cam-tab-btn active" id="btn-select-cam1" onclick="switchCamSetup('primary', this)">
-          <span>📹</span> Camera 01 (North Perimeter Optical)
-        </button>
-        <button class="cam-tab-btn" id="btn-select-cam2" onclick="switchCamSetup('secondary', this)">
-          <span>🔥</span> Camera 02 (East Sector Thermal)
+          <span>📹</span> Primary Defense Camera (Optical HD 1080p)
         </button>
       </div>
 
@@ -1229,7 +1164,7 @@
     };
 
     let activeScope = 'weekly';
-    let activeCameraFilter = 'all';
+    let activeCameraFilter = 'primary';
     let hudActive = true;
     let toastTimer = null;
     let currentReportData = null;
@@ -1368,7 +1303,8 @@
               appendEventLog(data);
               const spdVal = parseFloat(data.speed_kmh !== undefined ? data.speed_kmh : 0.0).toFixed(1);
               const mStateVal = data.motion_state || 'HOVERING';
-              showToast(`🚨 Hostile target detected on ${data.camera_id || 'CAM 01'}! [BRG: ${(data.bearing_deg || 100.1).toFixed(1)}° | DST: ${(data.distance_m || 85).toFixed(0)}m | SPD: ${spdVal} km/h | ${mStateVal}]`);
+              const etaToastPart = (mStateVal === 'INBOUND' && (data.eta_str || data.eta_seconds)) ? ` | ⏱️ ETA: ${data.eta_str || (data.eta_seconds + 's')}` : '';
+              showToast(`🚨 Hostile target detected on ${data.camera_id || 'CAM 01'}! [BRG: ${(data.bearing_deg || 100.1).toFixed(1)}° | DST: ${(data.distance_m || 85).toFixed(0)}m | SPD: ${spdVal} km/h | ${mStateVal}${etaToastPart}]`);
               startSirenCountdown(30);
               playBrowserSirenSound(30);
 
@@ -1380,7 +1316,8 @@
                 const gndVal = (data.ground_distance_m || 84).toFixed(0);
                 const latVal = (data.drone_lat || 33.685123).toFixed(5);
                 const lonVal = (data.drone_lon || 73.048934).toFixed(5);
-                bText.textContent = `TACTICAL ALERT: AERIAL DRONE DETECTED [BRG: ${brgVal}° | DST: ${dstVal}m | GND: ${gndVal}m | SPD: ${spdVal} km/h (${mStateVal}) | GPS: ${latVal}, ${lonVal}] — 30s SIREN SOUNDING`;
+                const etaBanner = (mStateVal === 'INBOUND' && (data.eta_str || data.eta_seconds)) ? ` | ⚡ BASE ETA: ${data.eta_str || (data.eta_seconds + 's')}` : '';
+                bText.textContent = `TACTICAL ALERT: AERIAL DRONE DETECTED [BRG: ${brgVal}° | DST: ${dstVal}m | GND: ${gndVal}m | SPD: ${spdVal} km/h (${mStateVal})${etaBanner} | GPS: ${latVal}, ${lonVal}] — 30s SIREN SOUNDING`;
                 banner.classList.add('active');
               }
 
@@ -1442,7 +1379,7 @@
       if (emptyRow) emptyRow.remove();
 
       const tid = String(t.track_id || t.target_id || 'TGT-#01');
-      const camId = t.camera_id === 'secondary' ? 'CAM 02 (Thermal FLIR)' : 'CAM 01 (Optical HD)';
+      const camId = 'CAM 01 (Optical HD)';
       const brg = parseFloat(t.bearing_deg !== undefined ? t.bearing_deg : (t.bearing || 90.0));
       const az = parseFloat(t.azimuth_deg !== undefined ? t.azimuth_deg : 0.0);
       const slant = parseFloat(t.distance_m || t.slant_distance_m || 85.0);
@@ -1459,6 +1396,34 @@
       const mState = t.motion_state || 'HOVERING';
       const mLabel = t.motion_label || `${mState}`;
 
+      // Calculate Time to Base / Camera Arrival (ETA)
+      let etaSec = t.eta_seconds !== undefined && t.eta_seconds !== null ? parseFloat(t.eta_seconds) : null;
+      let etaStr = t.eta_str || '';
+      if (etaSec === null && mState === 'INBOUND' && speedMps > 0.5) {
+        etaSec = slant / speedMps;
+        etaStr = etaSec < 60 ? `${etaSec.toFixed(1)}s` : `${Math.floor(etaSec / 60)}m ${Math.round(etaSec % 60)}s`;
+      }
+
+      let etaBadge = '';
+      if (slant <= 3.5) {
+        etaBadge = `<span class="badge-eta badge-eta-imminent">🚨 AT BASE (<3m)</span>`;
+      } else if (etaSec !== null && !isNaN(etaSec) && etaSec >= 0 && mState === 'INBOUND') {
+        const formattedEta = etaSec < 60 ? `${etaSec.toFixed(1)}s` : `${Math.floor(etaSec / 60)}m ${Math.round(etaSec % 60)}s`;
+        if (etaSec <= 10.0) {
+          etaBadge = `<span class="badge-eta badge-eta-critical" title="Drone reaching base camera in ${formattedEta}">⚡ ${formattedEta} (CRITICAL)</span>`;
+        } else if (etaSec <= 30.0) {
+          etaBadge = `<span class="badge-eta badge-eta-urgent" title="Drone reaching base camera in ${formattedEta}">⚠️ ${formattedEta}</span>`;
+        } else {
+          etaBadge = `<span class="badge-eta badge-eta-normal" title="Estimated time to reach camera">⏱️ ${formattedEta}</span>`;
+        }
+      } else if (mState === 'OUTBOUND') {
+        etaBadge = `<span class="badge-eta badge-eta-receding">🟢 N/A (Receding)</span>`;
+      } else if (mState === 'HOVERING') {
+        etaBadge = `<span class="badge-eta badge-eta-hovering">🟡 N/A (Stationary)</span>`;
+      } else {
+        etaBadge = `<span class="badge-eta badge-eta-transit">🔵 N/A (Crossing)</span>`;
+      }
+
       let motionBadge = '';
       if (mState === 'INBOUND') {
         motionBadge = `<span class="badge-motion badge-inbound">🔴 INBOUND</span>`;
@@ -1473,7 +1438,7 @@
       // Save to local registry
       trackedTargets[tid] = {
         tid, camId, brg, az, slant, gnd, alt, lat, lon, conf, timeStr,
-        speedKmh, speedMps, mState, mLabel,
+        speedKmh, speedMps, mState, mLabel, etaSec, etaStr,
         updated: Date.now()
       };
 
@@ -1495,6 +1460,7 @@
         <td><span style="color:#118ab2; font-weight:700;">${alt >= 0 ? '+' : ''}${alt.toFixed(1)} m</span></td>
         <td><span style="color:#ff9f1c; font-weight:700;">${speedKmh.toFixed(1)} km/h</span> <span style="font-size:0.72rem; color:var(--color-muted);">(${speedMps.toFixed(1)} m/s)</span></td>
         <td>${motionBadge}</td>
+        <td>${etaBadge}</td>
         <td><span class="gps-badge" onclick="copyGPS('${lat.toFixed(6)}, ${lon.toFixed(6)}')">📍 ${lat.toFixed(6)}, ${lon.toFixed(6)}</span></td>
         <td><span class="lock-pill">LOCKED [8/8]</span></td>
         <td style="color:var(--color-muted);">${timeStr}</td>
@@ -1521,6 +1487,14 @@
       const mState = t.motion_state || 'HOVERING';
       const mLabel = t.motion_label || `${mState}`;
 
+      let etaSec = t.eta_seconds !== undefined && t.eta_seconds !== null ? parseFloat(t.eta_seconds) : null;
+      if (etaSec === null && mState === 'INBOUND' && speedKmh > 2.0) {
+        const smps = speedKmh / 3.6;
+        etaSec = gnd / Math.max(0.5, smps);
+      }
+      const etaFormatted = (etaSec !== null && !isNaN(etaSec) && etaSec > 0) ? (etaSec < 60 ? `${etaSec.toFixed(1)}s` : `${Math.floor(etaSec/60)}m ${Math.round(etaSec%60)}s`) : null;
+      const etaTag = (mState === 'INBOUND' && etaFormatted) ? ` | ETA: ${etaFormatted}` : '';
+
       // Dynamic color by motion state
       let stateColor = '#ffd166';
       if (mState === 'INBOUND') stateColor = '#ff4757';
@@ -1540,7 +1514,7 @@
         blip = document.createElement('div');
         blip.className = 'radar-blip';
         blip.id = `radar-blip-${tid.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
-        blip.title = `Target: ${tid} | Bearing: ${brg.toFixed(1)}° | Ground: ${gnd.toFixed(1)}m | Alt: ${alt.toFixed(1)}m | Speed: ${speedKmh.toFixed(1)} km/h (${mLabel})`;
+        blip.title = `Target: ${tid} | Bearing: ${brg.toFixed(1)}° | Ground: ${gnd.toFixed(1)}m | Alt: ${alt.toFixed(1)}m | Speed: ${speedKmh.toFixed(1)} km/h (${mLabel})${etaFormatted ? ' | ETA: ' + etaFormatted : ''}`;
         blip.innerHTML = `
           <div class="radar-blip__pulse-ring" style="border-color:${stateColor};"></div>
           <div class="radar-blip__icon-box" style="background:${stateColor};">
@@ -1555,7 +1529,7 @@
             </svg>
           </div>
           <div class="radar-blip__tag" id="radar-blip-tag-${tid.replace(/[^a-zA-Z0-9_-]/g, '_')}">
-            ${tid} | ${Math.round(gnd)}m | ${speedKmh.toFixed(0)}km/h | ${mState}
+            ${tid} | ${Math.round(gnd)}m | ${speedKmh.toFixed(0)}km/h | ${mState}${etaTag}
           </div>
         `;
         container.appendChild(blip);
@@ -1567,11 +1541,12 @@
 
       const tag = document.getElementById(`radar-blip-tag-${tid.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
       if (tag) {
-        tag.textContent = `${tid} | ${Math.round(gnd)}m | ${speedKmh.toFixed(0)}km/h | ${mState}`;
+        tag.textContent = `${tid} | ${Math.round(gnd)}m | ${speedKmh.toFixed(0)}km/h | ${mState}${etaTag}`;
       }
 
       if (footerTxt) {
-        footerTxt.innerHTML = `<span style="color:${stateColor}; font-weight:800; animation:pulseDot 1s infinite;">🚨 TARGET ${tid}: ${Math.round(gnd)}m @ ${brg.toFixed(1)}° (${getCardinalDirection(brg)}) | SPD: ${speedKmh.toFixed(1)} km/h | [${mLabel}]</span>`;
+        const etaSummary = (mState === 'INBOUND' && etaFormatted) ? ` | ⏱️ BASE ETA: ${etaFormatted}` : '';
+        footerTxt.innerHTML = `<span style="color:${stateColor}; font-weight:800; animation:pulseDot 1s infinite;">🚨 TARGET ${tid}: ${Math.round(gnd)}m @ ${brg.toFixed(1)}° (${getCardinalDirection(brg)}) | SPD: ${speedKmh.toFixed(1)} km/h | [${mLabel}]${etaSummary}</span>`;
       }
     }
 
@@ -1778,11 +1753,7 @@
       const container = document.getElementById('plotly-main-timeline');
       if (!container) return;
 
-      const camLabel = activeCameraFilter === 'primary'
-        ? '[Camera 01: North Perimeter Optical HD]'
-        : (activeCameraFilter === 'secondary'
-          ? '[Camera 02: East Sector FLIR Thermal]'
-          : '[Dual Camera Multi-Sensor Coverage]');
+      const camLabel = '[Camera 01: Optical HD 1080p]';
 
       let traces = [];
       let title = '';
@@ -1909,29 +1880,17 @@
             fillcolor: 'rgba(154, 30, 35, 0.2)',
             marker: { size: 7, color: THEME.secondary }
           });
-        } else if (activeCameraFilter === 'primary') {
+        } else {
           traces.push({
             x: data.labels,
-            y: data.active_counts,
-            name: 'Camera 01 (North Optical Only)',
+            y: data.active_counts || data.camera1,
+            name: 'Cam 01 (Primary Optical HD)',
             type: 'scatter',
             mode: 'lines+markers',
             line: { color: THEME.accent, width: 3.5, shape: 'spline' },
             fill: 'tozeroy',
             fillcolor: 'rgba(243, 165, 173, 0.22)',
             marker: { size: 8, color: THEME.accent }
-          });
-        } else {
-          traces.push({
-            x: data.labels,
-            y: data.active_counts,
-            name: 'Camera 02 (East Thermal Only)',
-            type: 'scatter',
-            mode: 'lines+markers',
-            line: { color: THEME.secondary, width: 3.5, shape: 'spline' },
-            fill: 'tozeroy',
-            fillcolor: 'rgba(154, 30, 35, 0.3)',
-            marker: { size: 8, color: THEME.secondary }
           });
         }
       }
@@ -2150,17 +2109,15 @@
     }
 
     function filterCameraCharts(cam, btn) {
-      activeCameraFilter = cam;
-      btn.parentElement.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+      activeCameraFilter = 'primary';
+      if (btn && btn.parentElement) {
+        btn.parentElement.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      }
 
-      // Re-render all 5 charts with the selected camera filter
+      // Re-render all 5 charts with single camera filter
       initPlotlyCharts();
-
-      const label = cam === 'all'
-        ? 'Both Cameras (Composite)'
-        : (cam === 'primary' ? 'Camera 01 (Optical HD)' : 'Camera 02 (Thermal FLIR)');
-      showToast(`Plotly charts filtered for: ${label}`);
+      showToast('Plotly analytics scoped to: Camera 01 (Optical HD)');
     }
 
     function refreshAllPlotlyCharts() {
@@ -2333,12 +2290,12 @@
       if (!container) return;
 
       const sampleSnapshots = [
-        { title: 'Quadcopter Incursion #481', time: 'Today 21:28', cam: 'CAM 01 North', alt: '118m' },
-        { title: 'Fixed-Wing Recon UAV #480', time: 'Today 19:45', cam: 'CAM 02 Thermal', alt: '240m' },
-        { title: 'Micro-FPV Perimeter Breach', time: 'Today 18:12', cam: 'CAM 01 North', alt: '85m' },
-        { title: 'Commercial Drone Night Recon', time: 'Yesterday 23:10', cam: 'CAM 02 Thermal', alt: '160m' },
-        { title: 'Tactical UAS Track Alpha', time: 'Yesterday 17:35', cam: 'CAM 01 North', alt: '195m' },
-        { title: 'Multi-Rotor Hover Threat', time: '01 Oct 16:20', cam: 'CAM 02 Thermal', alt: '140m' },
+        { title: 'Quadcopter Incursion #481', time: 'Today 21:28', cam: 'CAM 01 (Optical HD)', alt: '118m' },
+        { title: 'Fixed-Wing Recon UAV #480', time: 'Today 19:45', cam: 'CAM 01 (Optical HD)', alt: '240m' },
+        { title: 'Micro-FPV Perimeter Breach', time: 'Today 18:12', cam: 'CAM 01 (Optical HD)', alt: '85m' },
+        { title: 'Commercial Drone Night Recon', time: 'Yesterday 23:10', cam: 'CAM 01 (Optical HD)', alt: '160m' },
+        { title: 'Tactical UAS Track Alpha', time: 'Yesterday 17:35', cam: 'CAM 01 (Optical HD)', alt: '195m' },
+        { title: 'Multi-Rotor Hover Threat', time: '01 Oct 16:20', cam: 'CAM 01 (Optical HD)', alt: '140m' },
       ];
 
       container.innerHTML = '';

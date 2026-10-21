@@ -489,11 +489,17 @@ def render_hud(
             speed_line = gps_data.get("speed_str", "SPD: -- | STATUS: HOVERING")
             gps_line   = gps_data['gps_str']
             m_state    = gps_data.get("motion_state", "HOVERING")
+            eta_val    = gps_data.get("eta_seconds")
+            time_to_base_str = gps_data.get("time_to_base_str", "TIME TO BASE: N/A")
+            closing_kmh = gps_data.get("closing_speed_kmh", 0.0)
         else:
             dist_line  = "DST: -- | GND: --"
             speed_line = "SPD: -- | STATUS: --"
             gps_line   = "GPS: NOT CONFIGURED"
             m_state    = "UNKNOWN"
+            eta_val    = None
+            time_to_base_str = "TIME TO BASE: N/A"
+            closing_kmh = 0.0
 
         # Flight motion status dynamic color code
         if m_state == "INBOUND":
@@ -507,14 +513,33 @@ def render_hud(
         else:
             spd_color = CLR_WHITE
 
-        tag_w = max(340, max(len(tag_title), len(tag_sub), len(dist_line), len(speed_line), len(gps_line)) * 7 + 10)
-        banner_top = max(42, py1 - 68)
-        cv2.rectangle(frame, (px1, banner_top), (min(w - 5, px1 + tag_w), max(68, py1)), CLR_HUD_BG, -1)
-        cv2.putText(frame, tag_title,  (px1 + 4, banner_top + 15), cv2.FONT_HERSHEY_SIMPLEX, 0.38, CLR_ACCENT, 1, cv2.LINE_AA)
-        cv2.putText(frame, tag_sub,    (px1 + 4, banner_top + 28), cv2.FONT_HERSHEY_SIMPLEX, 0.35, box_color,  1, cv2.LINE_AA)
-        cv2.putText(frame, dist_line,  (px1 + 4, banner_top + 41), cv2.FONT_HERSHEY_SIMPLEX, 0.34, CLR_YELLOW, 1, cv2.LINE_AA)
-        cv2.putText(frame, speed_line, (px1 + 4, banner_top + 53), cv2.FONT_HERSHEY_SIMPLEX, 0.34, spd_color,   1, cv2.LINE_AA)
-        cv2.putText(frame, gps_line,   (px1 + 4, banner_top + 65), cv2.FONT_HERSHEY_SIMPLEX, 0.34, CLR_GREEN,  1, cv2.LINE_AA)
+        # Dynamic ETA to Base line and color code
+        if m_state == "INBOUND" and eta_val is not None:
+            if eta_val <= 10.0:
+                eta_line  = f"BASE ETA: {eta_val:.1f}s [CRITICAL CLOSE]"
+                eta_color = CLR_CRIMSON
+            elif eta_val <= 30.0:
+                eta_line  = f"BASE ETA: {eta_val:.1f}s [CLOSING @ {closing_kmh:.1f} km/h]"
+                eta_color = CLR_ALERT
+            else:
+                eta_line  = f"BASE ETA: {gps_data.get('eta_str', '')} [APPROACHING BASE]"
+                eta_color = CLR_YELLOW
+        elif gps_data and gps_data.get("slant_distance_m", 999) <= 3.0:
+            eta_line  = "BASE ETA: ARRIVED (<3m AT CAMERA BASE)"
+            eta_color = CLR_ALERT
+        else:
+            eta_line  = time_to_base_str
+            eta_color = CLR_WHITE
+
+        tag_w = max(340, max(len(tag_title), len(tag_sub), len(dist_line), len(speed_line), len(eta_line), len(gps_line)) * 7 + 10)
+        banner_top = max(42, py1 - 82)
+        cv2.rectangle(frame, (px1, banner_top), (min(w - 5, px1 + tag_w), max(82, py1)), CLR_HUD_BG, -1)
+        cv2.putText(frame, tag_title,  (px1 + 4, banner_top + 14), cv2.FONT_HERSHEY_SIMPLEX, 0.38, CLR_ACCENT, 1, cv2.LINE_AA)
+        cv2.putText(frame, tag_sub,    (px1 + 4, banner_top + 27), cv2.FONT_HERSHEY_SIMPLEX, 0.35, box_color,  1, cv2.LINE_AA)
+        cv2.putText(frame, dist_line,  (px1 + 4, banner_top + 40), cv2.FONT_HERSHEY_SIMPLEX, 0.34, CLR_YELLOW, 1, cv2.LINE_AA)
+        cv2.putText(frame, speed_line, (px1 + 4, banner_top + 52), cv2.FONT_HERSHEY_SIMPLEX, 0.34, spd_color,   1, cv2.LINE_AA)
+        cv2.putText(frame, eta_line,   (px1 + 4, banner_top + 65), cv2.FONT_HERSHEY_SIMPLEX, 0.35, eta_color,   1, cv2.LINE_AA)
+        cv2.putText(frame, gps_line,   (px1 + 4, banner_top + 77), cv2.FONT_HERSHEY_SIMPLEX, 0.34, CLR_GREEN,  1, cv2.LINE_AA)
 
         # Broadcast telemetry to live dashboard SSE if active
         if gps_data and m and m.state in (TargetThreatState.CONFIRMED, TargetThreatState.COOLDOWN):
@@ -536,6 +561,11 @@ def render_hud(
                     "speed_mps": gps_data.get("speed_mps", 0.0),
                     "motion_state": gps_data.get("motion_state", "HOVERING"),
                     "motion_label": gps_data.get("motion_label", "HOVERING (STATIONARY)"),
+                    "closing_speed_kmh": gps_data.get("closing_speed_kmh", 0.0),
+                    "closing_speed_mps": gps_data.get("closing_speed_mps", 0.0),
+                    "eta_seconds": gps_data.get("eta_seconds"),
+                    "eta_str": gps_data.get("eta_str", "N/A"),
+                    "time_to_base_str": gps_data.get("time_to_base_str", "TIME TO BASE: N/A"),
                     "altitude_m": gps_data["drone_altitude_m"],
                     "drone_lat": gps_data["drone_lat"],
                     "drone_lon": gps_data["drone_lon"],
@@ -557,11 +587,23 @@ def render_hud(
         if dist_estimator:
             gd = dist_estimator.estimate_from_detection(detections[0], p_ang, track_id="hud_hdr")
             header_left += f" | {gd['dist_str']} | {gd['gps_str']}"
-
-    cv2.putText(frame, header_left, (12, 23), cv2.FONT_HERSHEY_SIMPLEX, 0.40, CLR_WHITE, 1, cv2.LINE_AA)
+            if gd.get("motion_state") == "INBOUND" and gd.get("eta_seconds") is not None:
+                header_left += f" | BASE ETA: {gd['eta_str']}"
 
     header_right = f"THREAT: {threat_str} | 8F-LOCK"
     (tw, _), _ = cv2.getTextSize(header_right, cv2.FONT_HERSHEY_SIMPLEX, 0.44, 1)
+    max_left_w = w - tw - 24
+
+    # Ensure header_left fits cleanly without colliding with header_right
+    (lw, _), _ = cv2.getTextSize(header_left, cv2.FONT_HERSHEY_SIMPLEX, 0.38, 1)
+    if lw > max_left_w:
+        header_left = f"F: {frame_idx}/{total_frames} | HDG: {cam_hdg:.0f} deg"
+        if detections and bearing_calculator:
+            header_left += f" | BRG: {p_ang['true_bearing_deg']:.0f} deg"
+            if dist_estimator and gd.get("motion_state") == "INBOUND" and gd.get("eta_seconds") is not None:
+                header_left += f" | ETA: {gd['eta_str']}"
+
+    cv2.putText(frame, header_left, (12, 23), cv2.FONT_HERSHEY_SIMPLEX, 0.38, CLR_WHITE, 1, cv2.LINE_AA)
     cv2.putText(frame, header_right, (w - tw - 12, 23), cv2.FONT_HERSHEY_SIMPLEX, 0.44, status_clr, 2, cv2.LINE_AA)
 
     # ── Bottom Telemetry Footer ──────────────────────────────────────

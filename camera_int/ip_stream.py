@@ -346,11 +346,11 @@ class IPCameraStream:
         # Target label
         cv2.rectangle(img, (bx1, by1 - 18), (bx1 + 160, by1), (20, 10, 40), -1)
         cv2.putText(img, label, (bx1 + 4, by1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.34, accent_bgr, 1, cv2.LINE_AA)
-        cv2.putText(img, f"CONF: {conf} | BRG: {self.azimuth_deg:.1f}°", (bx1, by2 + 14), cv2.FONT_HERSHEY_SIMPLEX, 0.32, (200, 200, 240), 1, cv2.LINE_AA)
+        cv2.putText(img, f"CONF: {conf} | BRG: {self.azimuth_deg:.1f} DEG", (bx1, by2 + 14), cv2.FONT_HERSHEY_SIMPLEX, 0.32, (200, 200, 240), 1, cv2.LINE_AA)
 
         # Top Bar: Camera Label & Status
         status_text = "LIVE [IP CONNECTED]" if self.healthy else "STANDBY [SIMULATOR MODE]"
-        cam_label = self.config.get("name", self.camera_id).upper()
+        cam_label = self.config.get("name", self.camera_id).replace("—", "-").replace("–", "-").upper()
         cv2.putText(img, f"{status_text}  {cam_label}", (14, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (241, 244, 247), 1, cv2.LINE_AA)
 
         # Blinking REC dot
@@ -358,7 +358,7 @@ class IPCameraStream:
             cv2.circle(img, (w - 24, 20), 5, (35, 30, 230), -1)
 
         # Bottom Bar: GPS Geolocation Telemetry
-        gps_text = f"GPS: {self.latitude:.4f} N, {self.longitude:.4f} E | {self.city.upper()} | AZ: {self.azimuth_deg:.1f}°"
+        gps_text = f"GPS: {self.latitude:.4f} N, {self.longitude:.4f} E | {self.city.upper()} | AZ: {self.azimuth_deg:.1f} DEG"
         cv2.putText(img, gps_text, (14, h - 14), cv2.FONT_HERSHEY_SIMPLEX, 0.34, accent_bgr, 1, cv2.LINE_AA)
 
         time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

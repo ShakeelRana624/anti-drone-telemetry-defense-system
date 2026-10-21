@@ -1,7 +1,7 @@
 {
   "primary": {
     "id": "primary",
-    "name": "Camera 01 — North Perimeter",
+    "name": "Camera 01 - North Perimeter",
     "sensor_type": "optical",
     "connection_mode": "ip_rtsp",
     "ip": "192.168.1.101",
@@ -22,29 +22,5 @@
     ],
     "enabled": true,
     "notes": "Main optical zoom covering northern airspace perimeter."
-  },
-  "secondary": {
-    "id": "secondary",
-    "name": "Camera 02 — East Sector (Thermal)",
-    "sensor_type": "thermal",
-    "connection_mode": "ip_rtsp",
-    "ip": "192.168.1.102",
-    "port": 554,
-    "username": "admin",
-    "password": "",
-    "rtsp_path": "/stream2",
-    "custom_url": "",
-    "city": "Rawalpindi",
-    "latitude": 33.5973,
-    "longitude": 73.0479,
-    "azimuth_deg": 128.5,
-    "fov_deg": 60.0,
-    "fps": 25,
-    "resolution": [
-      1280,
-      720
-    ],
-    "enabled": true,
-    "notes": "Long-wave FLIR thermal camera covering eastern vector."
   }
 }

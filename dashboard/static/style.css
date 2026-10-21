@@ -12,43 +12,45 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;600;700&display=swap');
 
 :root {
-  --color-primary:       #680202;
-  --color-primary-rgb:   104, 2, 2;
-  --color-secondary:     #9A1E23;
+  --color-primary: #680202;
+  --color-primary-rgb: 104, 2, 2;
+  --color-secondary: #9A1E23;
   --color-secondary-rgb: 154, 30, 35;
-  --color-accent:        #F3A5AD;
-  --color-accent-rgb:    243, 165, 173;
-  --color-accent-soft:   rgba(243, 165, 173, 0.12);
-  --color-dark:          #1A0A0B;
-  --color-dark-surface:  #240F11;
-  --color-dark-card:     #2D1316;
+  --color-accent: #F3A5AD;
+  --color-accent-rgb: 243, 165, 173;
+  --color-accent-soft: rgba(243, 165, 173, 0.12);
+  --color-dark: #1A0A0B;
+  --color-dark-surface: #240F11;
+  --color-dark-card: #2D1316;
   --color-dark-elevated: #38191D;
-  --color-border:        #4D2327;
-  --color-border-glow:   rgba(243, 165, 173, 0.35);
-  --color-light:         #F7F4F1;
-  --color-muted:         #D4B2B6;
-  --color-dim:           #8F6A6E;
+  --color-border: #4D2327;
+  --color-border-glow: rgba(243, 165, 173, 0.35);
+  --color-light: #F7F4F1;
+  --color-muted: #D4B2B6;
+  --color-dim: #8F6A6E;
 
-  --status-ok:           #2EC4B6;
-  --status-warn:         #FF9F1C;
-  --status-danger:       #E71D36;
+  --status-ok: #2EC4B6;
+  --status-warn: #FF9F1C;
+  --status-danger: #E71D36;
 
-  --font-main:           'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono:           'JetBrains Mono', 'Consolas', monospace;
+  --font-main: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Consolas', monospace;
 
-  --radius-sm:           6px;
-  --radius-md:           12px;
-  --radius-lg:           18px;
-  --radius-xl:           24px;
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
 
-  --shadow-sm:           0 2px 10px rgba(0, 0, 0, 0.35);
-  --shadow-md:           0 8px 24px rgba(26, 10, 11, 0.65);
-  --shadow-glow:         0 0 25px rgba(154, 30, 35, 0.45);
-  --shadow-rose:         0 0 20px rgba(243, 165, 173, 0.25);
+  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 8px 24px rgba(26, 10, 11, 0.65);
+  --shadow-glow: 0 0 25px rgba(154, 30, 35, 0.45);
+  --shadow-rose: 0 0 20px rgba(243, 165, 173, 0.25);
 }
 
 /* ── Reset & Baseline ────────────────────────────────────────── */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -95,12 +97,9 @@ img {
 
 /* ── Top Navigation Bar ──────────────────────────────────────── */
 .navbar {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 1000;
-  background: rgba(26, 10, 11, 0.88);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(26, 10, 11, 0.94);
   border-bottom: 1px solid var(--color-border);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
@@ -244,8 +243,17 @@ img {
 }
 
 @keyframes pulseDot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.85); }
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
 }
 
 .clock-display {
@@ -285,16 +293,24 @@ img {
 }
 
 @keyframes bannerShift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
 /* ── Main Layout Container ───────────────────────────────────── */
 .dashboard-container {
   max-width: 1600px;
   margin: 0 auto;
-  padding: 1.5rem 1.5rem 3rem;
+  padding: 0.85rem 1.5rem 2.5rem;
 }
 
 /* Tab Panels */
@@ -308,23 +324,30 @@ img {
 }
 
 @keyframes fadeInTab {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ── Top Metric Cards Row ────────────────────────────────────── */
 .kpi-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1.1rem;
-  margin-bottom: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1rem;
 }
 
 .kpi-card {
   background: linear-gradient(145deg, rgba(45, 19, 22, 0.85), rgba(36, 15, 17, 0.95));
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  padding: 1.1rem 1.25rem;
+  padding: 0.7rem 1.1rem;
   position: relative;
   overflow: hidden;
   transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s;
@@ -356,7 +379,7 @@ img {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 
 .kpi-card__title {
@@ -380,7 +403,7 @@ img {
 }
 
 .kpi-card__value {
-  font-size: 2rem;
+  font-size: 1.6rem;
   font-weight: 800;
   color: var(--color-light);
   line-height: 1.1;
@@ -390,9 +413,9 @@ img {
 .kpi-card__sub {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.4rem;
-  font-size: 0.72rem;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
   color: var(--color-dim);
 }
 
@@ -407,14 +430,14 @@ img {
 
 /* ── Dual Camera Grid ────────────────────────────────────────── */
 .camera-section {
-  margin-bottom: 1.8rem;
+  margin-bottom: 1.25rem;
 }
 
 .section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1rem;
+  margin-bottom: 0.65rem;
 }
 
 .section-title {
@@ -431,14 +454,29 @@ img {
   color: var(--color-accent);
 }
 
-.cameras-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1.3rem;
+.cameras-grid,
+.cameras-grid--single {
+  display: flex;
+  justify-content: center;
+  width: 100%;
 }
 
-@media (max-width: 1024px) {
-  .cameras-grid {
+/* ── Tactical Airspace C2: Left Camera Feed + Right Radar Scope ── */
+.c2-airspace-section {
+  margin-bottom: 1.5rem;
+}
+
+.c2-split-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(340px, 420px);
+  gap: 1.25rem;
+  align-items: stretch;
+  width: 100%;
+  margin-top: 0.6rem;
+}
+
+@media (max-width: 1100px) {
+  .c2-split-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -451,6 +489,48 @@ img {
   box-shadow: var(--shadow-md);
   position: relative;
   transition: border-color 0.3s;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+}
+
+.c2-split-grid .camera-feed-card {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.c2-split-grid .camera-viewport {
+  flex: 1;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: clamp(320px, 50vh, 520px);
+}
+
+.c2-split-grid .radar-card {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.c2-split-grid .radar-scope-wrapper {
+  max-width: 350px;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  margin: auto;
+}
+
+.telemetry-card--full {
+  width: 100%;
+  max-width: 100%;
+  margin-top: 1.25rem;
 }
 
 .camera-feed-card:hover {
@@ -458,7 +538,7 @@ img {
 }
 
 .camera-feed-card__header {
-  padding: 0.75rem 1.1rem;
+  padding: 0.5rem 1rem;
   background: linear-gradient(90deg, rgba(45, 19, 22, 0.95), rgba(36, 15, 17, 0.9));
   border-bottom: 1px solid var(--color-border);
   display: flex;
@@ -478,13 +558,13 @@ img {
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.05em;
-  padding: 0.2rem 0.55rem;
+  padding: 0.18rem 0.55rem;
   border-radius: var(--radius-sm);
   border: 1px solid rgba(243, 165, 173, 0.3);
 }
 
 .camera-name {
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   font-weight: 600;
   color: var(--color-light);
 }
@@ -492,14 +572,14 @@ img {
 .camera-meta {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  font-size: 0.72rem;
+  gap: 0.6rem;
+  font-size: 0.7rem;
   color: var(--color-muted);
 }
 
 .meta-pill {
   background: rgba(0, 0, 0, 0.3);
-  padding: 0.2rem 0.5rem;
+  padding: 0.18rem 0.45rem;
   border-radius: var(--radius-sm);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -508,11 +588,17 @@ img {
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
+  max-height: clamp(320px, 54vh, 1280px);
   background: #0d0405;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.camera-viewport--expanded {
+  aspect-ratio: 16 / 9;
+  max-height: clamp(320px, 54vh, 1280px);
 }
 
 .camera-stream-img {
@@ -536,10 +622,33 @@ img {
   border: 2px solid var(--color-accent);
 }
 
-.hud-corner--tl { top: 12px; left: 12px; border-right: none; border-bottom: none; }
-.hud-corner--tr { top: 12px; right: 12px; border-left: none; border-bottom: none; }
-.hud-corner--bl { bottom: 12px; left: 12px; border-right: none; border-top: none; }
-.hud-corner--br { bottom: 12px; right: 12px; border-left: none; border-top: none; }
+.hud-corner--tl {
+  top: 12px;
+  left: 12px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.hud-corner--tr {
+  top: 12px;
+  right: 12px;
+  border-left: none;
+  border-bottom: none;
+}
+
+.hud-corner--bl {
+  bottom: 12px;
+  left: 12px;
+  border-right: none;
+  border-top: none;
+}
+
+.hud-corner--br {
+  bottom: 12px;
+  right: 12px;
+  border-left: none;
+  border-top: none;
+}
 
 .hud-reticle {
   position: absolute;
@@ -973,7 +1082,8 @@ img {
   color: var(--color-muted);
 }
 
-.control-select, .control-input {
+.control-select,
+.control-input {
   width: 100%;
   padding: 0.65rem 0.85rem;
   background: rgba(26, 10, 11, 0.85);
@@ -984,7 +1094,8 @@ img {
   font-size: 0.85rem;
 }
 
-.control-select:focus, .control-input:focus {
+.control-select:focus,
+.control-input:focus {
   outline: none;
   border-color: var(--color-accent);
   box-shadow: 0 0 10px rgba(243, 165, 173, 0.25);
@@ -1522,16 +1633,25 @@ img {
     background: #ffffff !important;
     color: #1a0a0b !important;
   }
-  .navbar, .nav-tabs, .report-controls-panel, .btn-export, .incursion-banner, .camera-setup-workspace {
+
+  .navbar,
+  .nav-tabs,
+  .report-controls-panel,
+  .btn-export,
+  .incursion-banner,
+  .camera-setup-workspace {
     display: none !important;
   }
+
   .dashboard-container {
     padding: 0 !important;
     max-width: 100% !important;
   }
+
   .report-workspace {
     grid-template-columns: 1fr !important;
   }
+
   .report-sheet-wrapper {
     background: #ffffff !important;
     border: 1px solid #ccc !important;
@@ -1539,22 +1659,27 @@ img {
     box-shadow: none !important;
     padding: 1rem !important;
   }
+
   .report-title-block h1 {
     color: #680202 !important;
   }
+
   .report-table th {
     background: #f7f4f1 !important;
     color: #680202 !important;
     border-color: #ddd !important;
   }
+
   .report-table td {
     color: #1a0a0b !important;
     border-color: #eee !important;
   }
+
   .report-kpi-box {
     background: #fdfbf9 !important;
     border-color: #ddd !important;
   }
+
   .report-kpi-box span {
     color: #680202 !important;
   }
@@ -1631,7 +1756,7 @@ img {
   justify-content: center;
   color: var(--color-light);
   font-size: 1.2rem;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
   transition: transform 0.2s ease, background 0.2s ease;
 }
 
@@ -1772,8 +1897,13 @@ img {
 }
 
 @keyframes pulseCard {
-  from { background: rgba(104, 2, 2, 0.25); }
-  to { background: rgba(154, 30, 35, 0.45); }
+  from {
+    background: rgba(104, 2, 2, 0.25);
+  }
+
+  to {
+    background: rgba(154, 30, 35, 0.45);
+  }
 }
 
 .rf-unit-card__header {
@@ -1869,8 +1999,15 @@ img {
 }
 
 @keyframes pulseSirenRing {
-  from { transform: scale(1); border-color: #ff4757; }
-  to { transform: scale(1.06); border-color: var(--color-accent); }
+  from {
+    transform: scale(1);
+    border-color: #ff4757;
+  }
+
+  to {
+    transform: scale(1.06);
+    border-color: var(--color-accent);
+  }
 }
 
 .siren-timer-val {
@@ -1986,7 +2123,8 @@ img {
   }
 }
 
-.telemetry-card, .radar-card {
+.telemetry-card,
+.radar-card {
   background: linear-gradient(135deg, rgba(36, 15, 17, 0.85) 0%, rgba(26, 10, 11, 0.95) 100%);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -1996,7 +2134,8 @@ img {
   overflow: hidden;
 }
 
-.telemetry-card::before, .radar-card::before {
+.telemetry-card::before,
+.radar-card::before {
   content: '';
   position: absolute;
   top: 0;
@@ -2006,7 +2145,8 @@ img {
   background: linear-gradient(90deg, transparent, var(--color-accent), transparent);
 }
 
-.telemetry-card__header, .radar-card__header {
+.telemetry-card__header,
+.radar-card__header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -2015,7 +2155,8 @@ img {
   gap: 0.5rem;
 }
 
-.telemetry-card__title, .radar-card__title {
+.telemetry-card__title,
+.radar-card__title {
   font-size: 1.02rem;
   font-weight: 700;
   color: var(--color-light);
@@ -2171,6 +2312,63 @@ img {
   border: 1px solid rgba(255, 209, 102, 0.45);
 }
 
+.badge-eta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0.18rem 0.52rem;
+  border-radius: 4px;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.badge-eta-imminent {
+  background: rgba(255, 0, 55, 0.35);
+  color: #ff0055;
+  border: 1px solid rgba(255, 0, 55, 0.85);
+  animation: pulseDot 0.6s infinite;
+  box-shadow: 0 0 8px rgba(255, 0, 55, 0.4);
+}
+
+.badge-eta-critical {
+  background: rgba(231, 29, 54, 0.30);
+  color: #ff3366;
+  border: 1px solid rgba(231, 29, 54, 0.75);
+  animation: pulseDot 0.9s infinite;
+}
+
+.badge-eta-urgent {
+  background: rgba(255, 107, 107, 0.20);
+  color: #ff6b6b;
+  border: 1px solid rgba(255, 107, 107, 0.55);
+}
+
+.badge-eta-normal {
+  background: rgba(255, 193, 7, 0.18);
+  color: #ffc107;
+  border: 1px solid rgba(255, 193, 7, 0.45);
+}
+
+.badge-eta-receding {
+  background: rgba(6, 214, 160, 0.12);
+  color: #06d6a0;
+  border: 1px solid rgba(6, 214, 160, 0.35);
+}
+
+.badge-eta-hovering {
+  background: rgba(255, 209, 102, 0.12);
+  color: #ffd166;
+  border: 1px solid rgba(255, 209, 102, 0.35);
+}
+
+.badge-eta-transit {
+  background: rgba(0, 210, 211, 0.12);
+  color: #00d2d3;
+  border: 1px solid rgba(0, 210, 211, 0.35);
+}
+
 .telemetry-empty-row {
   text-align: center;
   padding: 2.5rem 1rem !important;
@@ -2213,10 +2411,27 @@ img {
   pointer-events: none;
 }
 
-.radar-ring--1 { width: 25%; height: 25%; }
-.radar-ring--2 { width: 50%; height: 50%; }
-.radar-ring--3 { width: 75%; height: 75%; }
-.radar-ring--4 { width: 96%; height: 96%; border-style: solid; border-color: rgba(243, 165, 173, 0.4); }
+.radar-ring--1 {
+  width: 25%;
+  height: 25%;
+}
+
+.radar-ring--2 {
+  width: 50%;
+  height: 50%;
+}
+
+.radar-ring--3 {
+  width: 75%;
+  height: 75%;
+}
+
+.radar-ring--4 {
+  width: 96%;
+  height: 96%;
+  border-style: solid;
+  border-color: rgba(243, 165, 173, 0.4);
+}
 
 .radar-ring-label {
   position: absolute;
@@ -2260,10 +2475,30 @@ img {
   pointer-events: none;
   z-index: 5;
 }
-.radar-cardinal--n { top: 6px; left: 50%; transform: translateX(-50%); }
-.radar-cardinal--s { bottom: 6px; left: 50%; transform: translateX(-50%); }
-.radar-cardinal--e { right: 8px; top: 50%; transform: translateY(-50%); }
-.radar-cardinal--w { left: 8px; top: 50%; transform: translateY(-50%); }
+
+.radar-cardinal--n {
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.radar-cardinal--s {
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.radar-cardinal--e {
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.radar-cardinal--w {
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
 
 /* Camera FOV Wedge (Facing East 90°) */
 .radar-cam-wedge {
@@ -2289,19 +2524,22 @@ img {
   pointer-events: none;
   z-index: 3;
   animation: radarSweep 4s linear infinite;
-  background: conic-gradient(
-    from 0deg at 0 0,
-    rgba(243, 165, 173, 0.45) 0deg,
-    rgba(243, 165, 173, 0.15) 25deg,
-    transparent 60deg
-  );
+  background: conic-gradient(from 0deg at 0 0,
+      rgba(243, 165, 173, 0.45) 0deg,
+      rgba(243, 165, 173, 0.15) 25deg,
+      transparent 60deg);
   border-top: 1.5px solid var(--color-accent);
   box-shadow: 0 0 10px rgba(243, 165, 173, 0.5);
 }
 
 @keyframes radarSweep {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Base Center Pinpoint */
@@ -2330,8 +2568,15 @@ img {
 }
 
 @keyframes radarPing {
-  0% { transform: scale(0.8); opacity: 1; }
-  100% { transform: scale(2.2); opacity: 0; }
+  0% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
 }
 
 /* ── Dynamic Drone Target Blip on Radar ── */
@@ -2376,13 +2621,27 @@ img {
 }
 
 @keyframes radarBlinkPulse {
-  0% { transform: scale(1); filter: drop-shadow(0 0 5px #ff1e28); }
-  100% { transform: scale(1.18); filter: drop-shadow(0 0 15px #ff1e28); }
+  0% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 5px #ff1e28);
+  }
+
+  100% {
+    transform: scale(1.18);
+    filter: drop-shadow(0 0 15px #ff1e28);
+  }
 }
 
 @keyframes radarRingPulse {
-  0% { transform: translate(-50%, -50%) scale(0.6); opacity: 1; }
-  100% { transform: translate(-50%, -50%) scale(2.4); opacity: 0; }
+  0% {
+    transform: translate(-50%, -50%) scale(0.6);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate(-50%, -50%) scale(2.4);
+    opacity: 0;
+  }
 }
 
 .radar-blip__tag {
@@ -2418,4 +2677,3 @@ img {
   flex-wrap: wrap;
   gap: 0.4rem;
 }
-

@@ -77,6 +77,11 @@ def push_sse_event(data: dict) -> None:
                 "speed_mps": float(data.get("speed_mps", 0.0)),
                 "motion_state": str(data.get("motion_state", "HOVERING")),
                 "motion_label": str(data.get("motion_label", "HOVERING (STATIONARY)")),
+                "eta_seconds": data.get("eta_seconds"),
+                "eta_str": str(data.get("eta_str", "N/A")),
+                "time_to_base_str": str(data.get("time_to_base_str", "TIME TO BASE: N/A")),
+                "closing_speed_kmh": float(data.get("closing_speed_kmh", 0.0)),
+                "closing_speed_mps": float(data.get("closing_speed_mps", 0.0)),
                 "timestamp": data.get("timestamp", datetime.now(timezone.utc).strftime("%H:%M:%S")),
                 "updated_at": datetime.now(timezone.utc).timestamp(),
             }
@@ -722,6 +727,11 @@ class DashboardApp:
                 "speed_mps": float(data.get("speed_mps", 12.5)),
                 "motion_state": str(data.get("motion_state", "INBOUND")),
                 "motion_label": str(data.get("motion_label", "INBOUND (APPROACHING)")),
+                "eta_seconds": round(slant_dist / max(0.5, float(data.get("speed_mps", 12.5))), 1) if str(data.get("motion_state", "INBOUND")) == "INBOUND" else None,
+                "eta_str": f"{round(slant_dist / max(0.5, float(data.get('speed_mps', 12.5))), 1):.1f}s" if str(data.get("motion_state", "INBOUND")) == "INBOUND" else f"N/A ({str(data.get('motion_state', 'HOVERING'))})",
+                "time_to_base_str": f"ETA BASE: {round(slant_dist / max(0.5, float(data.get('speed_mps', 12.5))), 1):.1f}s (APPROACHING @ {float(data.get('speed_kmh', 45.0)):.1f} km/h)" if str(data.get("motion_state", "INBOUND")) == "INBOUND" else f"TIME TO BASE: N/A ({str(data.get('motion_state', 'HOVERING'))})",
+                "closing_speed_kmh": float(data.get("speed_kmh", 45.0)) if str(data.get("motion_state", "INBOUND")) == "INBOUND" else 0.0,
+                "closing_speed_mps": float(data.get("speed_mps", 12.5)) if str(data.get("motion_state", "INBOUND")) == "INBOUND" else 0.0,
                 "confidence": "HIGH (96.4%)",
                 "status": "LOCKED",
                 "timestamp": datetime.now(timezone.utc).strftime("%H:%M:%S"),
@@ -1167,7 +1177,7 @@ def _generate_report_payload(period: str, camera: str) -> dict:
         total_incidents = 48
         high_threat = 12
         confirmed_intercepts = 48
-        top_sector = "East Sector - Camera 02 (Bearing 112°)"
+        top_sector = "North Perimeter - Camera 01 (Bearing 045°)"
         avg_range = "290 meters"
         table_rows = [
             {"period": "Day 1 (Monday)", "detections": 8, "threat": "LOW", "status": "RECORDED", "avg_conf": "94.2%"},
@@ -1183,7 +1193,7 @@ def _generate_report_payload(period: str, camera: str) -> dict:
         "title": title,
         "generated_at": now_str,
         "date_range": date_range,
-        "camera_scope": f"All Cameras (Camera 1 + Camera 2)" if camera == "all" else f"Filtered: {camera.upper()}",
+        "camera_scope": "Primary Sensor (Camera 01 — Optical HD 1080p)",
         "kpis": {
             "total_incidents": total_incidents,
             "high_threat": high_threat,
@@ -1195,7 +1205,7 @@ def _generate_report_payload(period: str, camera: str) -> dict:
         },
         "table": table_rows,
         "recommendations": [
-            "Maintain 24/7 dual camera continuous inference with SAHI 512x512 tile slicing.",
+            "Maintain 24/7 continuous optical inference with SAHI 512x512 tile slicing.",
             "Schedule perimeter radar sweep realignment towards North-East sector due to 42% incursion concentration.",
             "Keep siren and automated GSM alerting enabled during peak dusk hours (17:00 – 20:00).",
             "Perform weekly optical lens cleaning on Camera 01 for high contrast night vision.",
@@ -1205,20 +1215,33 @@ def _generate_report_payload(period: str, camera: str) -> dict:
 
 # Standalone runner for testing & direct visualization
 if __name__ == "__main__":
+    import sys
+    from pathlib import Path
+    project_root = Path(__file__).resolve().parent.parent
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+
     import yaml
     from logging_system.event_logger import EventLogger
-    dummy_config = {
-        "dashboard": {"host": "127.0.0.1", "port": 5000, "debug": False},
-        "logging": {"event_log_dir": "logs/events", "max_log_days": 30, "event_ring_buffer_size": 200},
-        "cameras": {
-            "primary": {"label": "Camera 1 — Primary (Optical North)"},
-            "secondary": {"label": "Camera 2 — Secondary (Thermal East)"}
+
+    cfg_file = project_root / "config" / "config.yaml"
+    if cfg_file.exists():
+        with open(cfg_file, "r", encoding="utf-8") as fh:
+            app_cfg = yaml.safe_load(fh)
+    else:
+        app_cfg = {
+            "dashboard": {"host": "127.0.0.1", "port": 5000, "debug": False},
+            "logging": {"event_log_dir": "logs/events", "max_log_days": 30, "event_ring_buffer_size": 200},
+            "cameras": {
+                "primary": {"label": "Camera 1 — Primary Optical HD (North Perimeter)"}
+            }
         }
-    }
-    dummy_logger = EventLogger(dummy_config)
-    dash = DashboardApp(dummy_config, dummy_logger)
-    dash.camera_status = {"primary": True, "secondary": True}
+
+    dummy_logger = EventLogger(app_cfg)
+    dash = DashboardApp(app_cfg, dummy_logger)
+    dash.camera_status = {"primary": True}
     dash.model_path = "YOLO11m + SAHI + DeepSORT [Online]"
-    print("Starting Drone Detection Dashboard at http://127.0.0.1:5000 ...")
-    dash.app.run(host="127.0.0.1", port=5000, debug=False, threaded=True)
+    port = app_cfg.get("dashboard", {}).get("port", 5000)
+    print(f"Starting Drone Detection Dashboard at http://127.0.0.1:{port} ...")
+    dash.app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
 
