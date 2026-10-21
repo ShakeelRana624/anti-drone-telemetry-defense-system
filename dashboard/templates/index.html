@@ -1474,6 +1474,50 @@
       }
     }
 
+    // Auto-purge stale targets older than 8s
+    setInterval(() => {
+      const now = Date.now();
+      let changed = false;
+      for (const [tid, tgt] of Object.entries(trackedTargets)) {
+        if (now - tgt.updated > 8000) {
+          delete trackedTargets[tid];
+          changed = true;
+          const row = document.getElementById(`tgt-row-${tid.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
+          if (row) row.remove();
+          const blip = document.getElementById(`radar-blip-${tid.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
+          if (blip) blip.remove();
+        }
+      }
+      if (changed) {
+        const activeCount = Object.keys(trackedTargets).length;
+        const badge = document.getElementById('telemetry-target-count-badge');
+        const countTxt = document.getElementById('telemetry-count-text');
+        const tbody = document.getElementById('telemetry-table-body');
+        if (activeCount === 0) {
+          if (badge && countTxt) {
+            badge.classList.remove('has-targets');
+            countTxt.textContent = '0 TARGETS LOCKED';
+          }
+          if (tbody && !document.getElementById('telemetry-empty-row')) {
+            tbody.innerHTML = `
+              <tr id="telemetry-empty-row">
+                <td colspan="11" class="telemetry-empty-row">
+                  📡 Airspace clear. Camera optical sensor and tactical radar scanning for targets...
+                </td>
+              </tr>
+            `;
+          }
+          const footerTxt = document.getElementById('radar-summary-target');
+          if (footerTxt) footerTxt.textContent = 'AIRSPACE CLEAR';
+        } else {
+          if (badge && countTxt) {
+            badge.classList.add('has-targets');
+            countTxt.textContent = `${activeCount} TARGET${activeCount > 1 ? 'S' : ''} LOCKED`;
+          }
+        }
+      }
+    }, 2000);
+
     function updateAirspaceRadar(t) {
       const container = document.getElementById('radar-blips-container');
       const footerTxt = document.getElementById('radar-summary-target');
@@ -1703,6 +1747,7 @@
       } catch {}
     }
     setTimeout(loadActiveTelemetryOnStartup, 800);
+    setInterval(loadActiveTelemetryOnStartup, 1000);
 
     // ═════════════════════════════════════════════════════════════
     // PLOTLY CHARTS IMPLEMENTATION (With User Brand Color Scheme)

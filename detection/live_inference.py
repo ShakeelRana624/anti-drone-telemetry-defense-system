@@ -54,7 +54,7 @@ class LiveDroneInferenceEngine:
     def __init__(
         self,
         model_path: str = "model/best.onnx",
-        conf_thresh: float = 0.35,
+        conf_thresh: float = 0.20,
         camera_heading: float = 45.0,
         cam_lat: float = 33.6844,
         cam_lon: float = 73.0479,
@@ -119,6 +119,7 @@ class LiveDroneInferenceEngine:
         self.last_active_targets: List[Dict[str, Any]] = []
         self.last_process_time = time.time()
         self.infer_fps = 0.0
+        self.telemetry_callback: Optional[Any] = None
 
     def process_frame(self, frame: np.ndarray, camera_id: str = "primary") -> np.ndarray:
         """
@@ -315,36 +316,42 @@ class LiveDroneInferenceEngine:
 
                 # Push live telemetry to C2 Dashboard (Radar Scope & Telemetry Feed Table)
                 if gps_data:
+                    telemetry_payload = {
+                        "event": "detection",
+                        "track_id": f"TGT-#{tid}" if tid is not None else "TGT-#01",
+                        "target_id": f"TGT-#{tid}" if tid is not None else "TGT-#01",
+                        "camera_id": camera_id,
+                        "drone_type": "Commercial Drone (Quadcopter)",
+                        "bearing_deg": float(true_brg),
+                        "azimuth_deg": float(rel_az),
+                        "elevation_deg": float(el_val),
+                        "distance_m": float(gps_data.get("slant_distance_m", 15.0)),
+                        "slant_distance_m": float(gps_data.get("slant_distance_m", 15.0)),
+                        "ground_distance_m": float(gps_data.get("ground_distance_m", 15.0)),
+                        "drone_altitude_m": float(gps_data.get("drone_altitude_m", 2.0)),
+                        "altitude_m": float(gps_data.get("drone_altitude_m", 2.0)),
+                        "drone_lat": float(gps_data.get("drone_lat", gps_data.get("drone_latitude", 33.6844))),
+                        "drone_lon": float(gps_data.get("drone_lon", gps_data.get("drone_longitude", 73.0479))),
+                        "speed_kmh": float(gps_data.get("speed_kmh", 0.0)),
+                        "speed_mps": float(gps_data.get("speed_mps", 0.0)),
+                        "motion_state": str(gps_data.get("motion_state", "HOVERING")),
+                        "motion_label": str(gps_data.get("motion_label", "HOVERING")),
+                        "eta_seconds": gps_data.get("eta_seconds"),
+                        "eta_str": str(gps_data.get("eta_str", "N/A")),
+                        "time_to_base_str": str(time_to_base_str),
+                        "closing_speed_kmh": float(closing_kmh),
+                        "confidence": f"{det.confidence * 100:.1f}%",
+                        "status": "LOCKED" if (m and m.state in (TargetThreatState.CONFIRMED, TargetThreatState.COOLDOWN)) else "TRACKING",
+                        "timestamp": datetime.now(timezone.utc).strftime("%H:%M:%S"),
+                    }
+                    if self.telemetry_callback is not None:
+                        try:
+                            self.telemetry_callback(telemetry_payload)
+                        except Exception as cb_err:
+                            logger.error("Telemetry callback error: %s", cb_err)
                     try:
                         from dashboard.app import push_sse_event
-                        push_sse_event({
-                            "event": "detection",
-                            "track_id": f"TGT-#{tid}" if tid is not None else "TGT-#01",
-                            "target_id": f"TGT-#{tid}" if tid is not None else "TGT-#01",
-                            "camera_id": camera_id,
-                            "drone_type": "Commercial Drone (Quadcopter)",
-                            "bearing_deg": true_brg,
-                            "azimuth_deg": rel_az,
-                            "elevation_deg": el_val,
-                            "distance_m": gps_data["slant_distance_m"],
-                            "slant_distance_m": gps_data["slant_distance_m"],
-                            "ground_distance_m": gps_data["ground_distance_m"],
-                            "drone_altitude_m": gps_data["drone_altitude_m"],
-                            "altitude_m": gps_data["drone_altitude_m"],
-                            "drone_lat": gps_data["drone_latitude"],
-                            "drone_lon": gps_data["drone_longitude"],
-                            "speed_kmh": gps_data.get("speed_kmh", 0.0),
-                            "speed_mps": gps_data.get("speed_mps", 0.0),
-                            "motion_state": gps_data.get("motion_state", "HOVERING"),
-                            "motion_label": gps_data.get("motion_label", "HOVERING"),
-                            "eta_seconds": gps_data.get("eta_seconds"),
-                            "eta_str": gps_data.get("eta_str", "N/A"),
-                            "time_to_base_str": time_to_base_str,
-                            "closing_speed_kmh": closing_kmh,
-                            "confidence": f"{det.confidence * 100:.1f}%",
-                            "status": "LOCKED" if (m and m.state in (TargetThreatState.CONFIRMED, TargetThreatState.COOLDOWN)) else "TRACKING",
-                            "timestamp": datetime.now(timezone.utc).strftime("%H:%M:%S"),
-                        })
+                        push_sse_event(telemetry_payload)
                     except Exception:
                         pass
 
