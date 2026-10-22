@@ -1,164 +1,116 @@
-# config.yaml — AI-Based Autonomous Drone Detection & Early Warning System
-# Military-Grade Configuration — All parameters in one place.
-# DO NOT commit this file with real phone numbers / serial ports to version control.
-
-# ─────────────────────────────────────────────────────────────────
-# Detection — YOLO11m inference
-# ─────────────────────────────────────────────────────────────────
 detection:
-  # Custom trained model (user trained model in model/ folder)
-  model_path:      "model/best.onnx"
-  fallback_model:  "yolo11m.pt"             # Ultralytics pretrained YOLO11m
-
-  confidence_threshold: 0.40               # Lower = more sensitive (tune post-training)
-  iou_threshold:        0.45               # NMS IoU
-  device:               "cpu"              # "cuda" | "cpu" | "0"
-  imgsz:                640                # Input image size for ONNX model
-
-  # Drone class IDs in your custom model (0: drone)
-  drone_classes: [0]
-
-  # ── SAHI (Slicing Aided Hyper Inference) ────────────────────
-  # Dramatically improves small/distant drone detection by slicing
-  # each frame into overlapping tiles and merging results.
+  model_path: model/best.onnx
+  fallback_model: yolo11m.pt
+  confidence_threshold: 0.4
+  iou_threshold: 0.45
+  device: cpu
+  imgsz: 640
+  drone_classes:
+  - 0
   sahi:
-    enabled:          true
-    slice_height:     512                  # Tile height in pixels
-    slice_width:      512                  # Tile width in pixels
-    overlap_ratio:    0.20                 # Tile overlap (0–1)
-    postprocess_type: "NMS"               # "NMS" | "GREEDYNMM"
-    postprocess_match_threshold: 0.50
-
-  # ── TTA (Test-Time Augmentation) ────────────────────────────
-  # Runs inference on augmented versions of each frame and merges.
-  # Small accuracy gain at ~2× inference cost. Disable if latency critical.
+    enabled: true
+    slice_height: 512
+    slice_width: 512
+    overlap_ratio: 0.2
+    postprocess_type: NMS
+    postprocess_match_threshold: 0.5
   tta:
     enabled: true
-
-# ─────────────────────────────────────────────────────────────────
-# Tracker — DeepSORT
-# ─────────────────────────────────────────────────────────────────
 tracker:
-  # Minimum consecutive frame hits before a track is "confirmed"
-  confirmation_frames:   2
-  # Maximum frames a track can go unmatched before deletion
-  max_age:               30
-  # Minimum IoU to associate a detection with an existing track
-  n_init:                2                 # DeepSORT internal init frames
-  max_cosine_distance:   0.40              # Re-ID appearance distance threshold
-  max_iou_distance:      0.90              # High-speed IoU distance threshold
-  max_coast_frames:      5                 # Kalman coasting frames during speed bursts
-  nn_budget:             100              # Max appearance descriptors per track
-
-  # Cross-camera spatial validation window (seconds)
-  cross_camera_check:    true
+  confirmation_frames: 2
+  max_age: 30
+  n_init: 2
+  max_cosine_distance: 0.4
+  max_iou_distance: 0.9
+  max_coast_frames: 5
+  nn_budget: 100
+  cross_camera_check: true
   cross_camera_window_s: 2.0
-
-# ─────────────────────────────────────────────────────────────────
-# Cameras
-# ─────────────────────────────────────────────────────────────────
 cameras:
   primary:
-    source: 0                              # Device index or RTSP URL
+    source: 1
     fps: 25
-    resolution: [1280, 720]
-    label: "Camera 1 — Primary Optical HD"
-
-# ─────────────────────────────────────────────────────────────────
-# Alerting
-# ─────────────────────────────────────────────────────────────────
+    resolution:
+    - 1280
+    - 720
+    label: "Camera 01 \u2014 Optical HD (USB)"
+    azimuth_deg: 180.0
+    camera_heading_deg: 180.0
 alerting:
-  cooldown_seconds: 45                     # Min gap between alert bursts per camera
-
+  cooldown_seconds: 45
   siren:
     enabled: true
-    gpio_pin: 17                           # BCM GPIO (Raspberry Pi / Jetson)
-    duration_seconds: 30                   # Siren alert duration (30 seconds)
-
+    gpio_pin: 17
+    duration_seconds: 30
   gsm_sms:
     enabled: true
-    port: "/dev/ttyUSB0"
+    port: /dev/ttyUSB0
     baud_rate: 9600
     recipients:
-      - "+92300XXXXXXX"
-      - "+92310XXXXXXX"
-    message_template: "DRONE ALERT [{timestamp}] Cam:{camera_id} Bearing:{bearing}deg Count:{count}"
-
+    - +92300XXXXXXX
+    - +92310XXXXXXX
+    message_template: DRONE ALERT [{timestamp}] Cam:{camera_id} Bearing:{bearing}deg
+      Count:{count}
   landline:
     enabled: false
-    port: "/dev/ttyS0"
-    dial_number: "0911"
-    message: "Drone detected. Immediate response required."
-
+    port: /dev/ttyS0
+    dial_number: 0911
+    message: Drone detected. Immediate response required.
   rf_comset:
     enabled: true
-    port: "/dev/ttyUSB1"
+    port: /dev/ttyUSB1
     baud_rate: 115200
     channel: 5
-    frequency_mhz: 433.050
-    prerecorded_message: "TACTICAL DRONE INTRUSION DETECTED AT {camera_id}. BEARING {bearing} DEGREES. DEPLOY AIR DEFENSE RESPONSE IMMEDIATELY."
+    frequency_mhz: 433.05
+    prerecorded_message: TACTICAL DRONE INTRUSION DETECTED AT {camera_id}. BEARING
+      {bearing} DEGREES. DEPLOY AIR DEFENSE RESPONSE IMMEDIATELY.
     units:
-      - id: "RF-01"
-        name: "Perimeter Guard Post Alpha"
-        callsign: "VANGUARD-1"
-        address: "0x01"
-        status: "ACTIVE"
-      - id: "RF-02"
-        name: "Quick Reaction Force (QRF)"
-        callsign: "STRIKER-2"
-        address: "0x02"
-        status: "ACTIVE"
-      - id: "RF-03"
-        name: "Tactical Operations Command"
-        callsign: "OVERLORD-HQ"
-        address: "0x03"
-        status: "ACTIVE"
-      - id: "RF-04"
-        name: "Air Defense & Interceptor Post"
-        callsign: "SHIELD-4"
-        address: "0x04"
-        status: "ACTIVE"
-      - id: "RF-05"
-        name: "Mobile Patrol Rover Team"
-        callsign: "HAWK-5"
-        address: "0x05"
-        status: "ACTIVE"
-
-# ─────────────────────────────────────────────────────────────────
-# Logging
-# ─────────────────────────────────────────────────────────────────
+    - id: RF-01
+      name: Perimeter Guard Post Alpha
+      callsign: VANGUARD-1
+      address: '0x01'
+      status: ACTIVE
+    - id: RF-02
+      name: Quick Reaction Force (QRF)
+      callsign: STRIKER-2
+      address: '0x02'
+      status: ACTIVE
+    - id: RF-03
+      name: Tactical Operations Command
+      callsign: OVERLORD-HQ
+      address: '0x03'
+      status: ACTIVE
+    - id: RF-04
+      name: Air Defense & Interceptor Post
+      callsign: SHIELD-4
+      address: '0x04'
+      status: ACTIVE
+    - id: RF-05
+      name: Mobile Patrol Rover Team
+      callsign: HAWK-5
+      address: '0x05'
+      status: ACTIVE
 logging:
-  level: "INFO"
-  event_log_dir: "logs/events"
-  snapshot_dir:  "logs/snapshots"
-  max_log_days:  30
+  level: INFO
+  event_log_dir: logs/events
+  snapshot_dir: logs/snapshots
+  max_log_days: 30
   event_ring_buffer_size: 200
-
-# ─────────────────────────────────────────────────────────────────
-# Dashboard
-# ─────────────────────────────────────────────────────────────────
 dashboard:
-  host: "0.0.0.0"
+  host: 0.0.0.0
   port: 5000
   debug: false
-  secret_key: "drone-watch-2026-change-me-in-production"
+  secret_key: drone-watch-2026-change-me-in-production
   max_snapshots_in_gallery: 20
-
-# ─────────────────────────────────────────────────────────────────
-# Bearing estimation
-# ─────────────────────────────────────────────────────────────────
 bearing:
-  camera_fov_horizontal: 90
-  camera_fov_vertical:   60
-  frame_width:  1280
+  camera_fov_horizontal: 90.0
+  camera_fov_vertical: 60
+  frame_width: 1280
   frame_height: 720
-
-# ─────────────────────────────────────────────────────────────────
-# System health monitor
-# ─────────────────────────────────────────────────────────────────
+  camera_heading_deg: 180.0
 system_health:
-  check_interval_seconds:       30
-  cpu_threshold_percent:        85
-  memory_threshold_percent:     80
-  disk_threshold_percent:       90
+  check_interval_seconds: 30
+  cpu_threshold_percent: 85
+  memory_threshold_percent: 80
+  disk_threshold_percent: 90
   temperature_threshold_celsius: 75

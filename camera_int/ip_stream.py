@@ -133,11 +133,10 @@ class IPCameraStream:
         if any(ip.lower().endswith(ext) for ext in [".mp4", ".avi", ".mov", ".mkv"]):
             return ip
 
-        # Auto fallback to test video if input.mp4 exists and IP is default placeholder
-        from pathlib import Path
-        test_vid = Path(__file__).resolve().parent.parent / "test_videos" / "input.mp4"
-        if ip in ("192.168.1.101", "localhost", "127.0.0.1", "") and test_vid.exists():
-            return str(test_vid)
+        # Strict user-specified RTSP / IP stream without auto-switching
+        ip = (cfg.get("ip") or "").strip()
+        if not ip:
+            return ""
 
         port = cfg.get("port", 554)
         user = (cfg.get("username") or "").strip()
@@ -183,10 +182,22 @@ class IPCameraStream:
             new_config: Dictionary containing updated camera profile values.
         """
         self.config.update(new_config)
-        self.city = new_config.get("city", self.city)
-        self.latitude = float(new_config.get("latitude", self.latitude))
-        self.longitude = float(new_config.get("longitude", self.longitude))
-        self.azimuth_deg = float(new_config.get("azimuth_deg", self.azimuth_deg))
+        self.city = new_config.get("city") or self.city
+        try:
+            if "latitude" in new_config and new_config["latitude"] not in (None, ""):
+                self.latitude = float(new_config["latitude"])
+        except (ValueError, TypeError):
+            pass
+        try:
+            if "longitude" in new_config and new_config["longitude"] not in (None, ""):
+                self.longitude = float(new_config["longitude"])
+        except (ValueError, TypeError):
+            pass
+        try:
+            if "azimuth_deg" in new_config and new_config["azimuth_deg"] not in (None, ""):
+                self.azimuth_deg = float(new_config["azimuth_deg"]) % 360.0
+        except (ValueError, TypeError):
+            pass
         new_source = self._resolve_source(self.config)
 
         if new_source != self.source:
@@ -247,7 +258,17 @@ class IPCameraStream:
 
                         if is_reachable:
                             t0 = time.perf_counter()
-                            cap = cv2.VideoCapture(self.source)
+                            import sys
+                            if is_usb and sys.platform == "win32":
+                                try:
+                                    dev_i = int(self.source)
+                                except (ValueError, TypeError):
+                                    dev_i = 0
+                                cap = cv2.VideoCapture(dev_i, cv2.CAP_DSHOW)
+                                if not cap.isOpened():
+                                    cap = cv2.VideoCapture(dev_i)
+                            else:
+                                cap = cv2.VideoCapture(self.source)
                             if cap.isOpened():
                                 cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
                                 self._cap = cap

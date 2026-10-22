@@ -156,9 +156,14 @@ class CameraConfigManager:
 
         target = self.cameras[camera_id]
         for key, value in new_data.items():
+            if value is None or value == "":
+                continue
             if key in ["latitude", "longitude", "azimuth_deg", "fov_deg"]:
                 try:
-                    target[key] = float(value)
+                    val = float(value)
+                    if key == "azimuth_deg":
+                        val = val % 360.0
+                    target[key] = val
                 except (ValueError, TypeError):
                     pass
             elif key in ["port", "fps"]:

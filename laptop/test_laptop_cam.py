@@ -268,16 +268,10 @@ class LaptopCameraTester:
             print(" [CAM] DSHOW failed, trying default backend...")
             cap = cv2.VideoCapture(self.camera_index)
 
-        if not cap.isOpened() and self.camera_index == 0:
-            print(" [CAM] Index 0 not available. Trying index 1...")
-            cap = cv2.VideoCapture(1, cv2.CAP_DSHOW)
-            if not cap.isOpened():
-                cap = cv2.VideoCapture(1)
-
         if not cap.isOpened():
             raise RuntimeError(
-                f"Could not open webcam at index {self.camera_index} or 1.\n"
-                "Please check that your laptop camera is not disabled or used by another app."
+                f"Could not open webcam at index {self.camera_index}.\n"
+                "Please check that your camera is plugged in and not used by another application."
             )
 
         # Configure preferred resolution & MJPG for maximum hardware throughput

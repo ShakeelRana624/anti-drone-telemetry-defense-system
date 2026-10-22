@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import logging
 import math
+import sys
+import time
 from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
@@ -123,23 +125,114 @@ class IPCameraManager:
             if self._running:
                 new_stream.start()
 
-        logger.info("Updated camera [%s] config: IP=%s, City=%s, Lat=%s, Lon=%s",
-                    camera_id, updated.get("ip"), updated.get("city"),
+        # Update Live Inference Engine if active
+        try:
+            from detection.live_inference import get_live_inference_engine
+            engine = get_live_inference_engine()
+            azimuth = updated.get("azimuth_deg")
+            lat = updated.get("latitude")
+            lon = updated.get("longitude")
+            fov = updated.get("fov_deg", 90.0)
+            engine.update_camera_params(heading=azimuth, lat=lat, lon=lon, fov_h=fov)
+        except Exception as e:
+            logger.debug("Could not update live inference engine: %s", e)
+
+        # Sync to config/config.yaml
+        try:
+            self._sync_to_yaml_config(camera_id, updated)
+        except Exception as e:
+            logger.debug("Could not sync to config.yaml: %s", e)
+
+        logger.info("Updated camera [%s] config: Mode=%s, Source=%s, Azimuth=%.1f deg, Lat=%s, Lon=%s",
+                    camera_id, updated.get("connection_mode"), updated.get("ip"),
+                    float(updated.get("azimuth_deg", 0.0)),
                     updated.get("latitude"), updated.get("longitude"))
         return updated
 
+    def _sync_to_yaml_config(self, camera_id: str, updated: Dict[str, Any]) -> None:
+        """Keep config/config.yaml in sync with camera updates."""
+        try:
+            import yaml
+            from pathlib import Path
+            cfg_file = Path(__file__).resolve().parent.parent / "config" / "config.yaml"
+            if not cfg_file.exists():
+                return
+            with open(cfg_file, "r", encoding="utf-8") as fh:
+                root_cfg = yaml.safe_load(fh) or {}
+
+            cams = root_cfg.setdefault("cameras", {})
+            target_cam = cams.setdefault(camera_id, {})
+            mode = updated.get("connection_mode", "ip_rtsp")
+            if mode in ("usb", "webcam"):
+                try:
+                    target_cam["source"] = int(updated.get("ip", 0))
+                except (ValueError, TypeError):
+                    target_cam["source"] = 0
+            else:
+                ip = updated.get("ip", "")
+                port = updated.get("port", 554)
+                path = updated.get("rtsp_path", "/stream1")
+                user = updated.get("username", "")
+                pwd = updated.get("password", "")
+                auth = f"{user}:{pwd}@" if user and pwd else (f"{user}@" if user else "")
+                target_cam["source"] = f"rtsp://{auth}{ip}:{port}{path}"
+
+            target_cam["label"] = updated.get("name", target_cam.get("label", "Primary Camera"))
+            target_cam["azimuth_deg"] = float(updated.get("azimuth_deg", 90.0))
+            target_cam["camera_heading_deg"] = float(updated.get("azimuth_deg", 90.0))
+
+            bearing_cfg = root_cfg.setdefault("bearing", {})
+            bearing_cfg["camera_heading_deg"] = float(updated.get("azimuth_deg", 90.0))
+            if "fov_deg" in updated:
+                bearing_cfg["camera_fov_horizontal"] = float(updated["fov_deg"])
+
+            with open(cfg_file, "w", encoding="utf-8") as fh:
+                yaml.safe_dump(root_cfg, fh, sort_keys=False)
+            logger.info("Synchronized camera [%s] config into config/config.yaml", camera_id)
+        except Exception as exc:
+            logger.warning("Failed to sync config.yaml: %s", exc)
+
     def test_connection(self, data: Dict[str, Any]) -> Tuple[bool, str, float]:
         """
-        Probe an IP camera endpoint before saving or applying configuration changes.
+        Probe an IP or USB camera endpoint before saving or applying configuration changes.
 
         Args:
-            data: Dictionary containing 'ip' and 'port'.
+            data: Dictionary containing 'ip', 'port', and 'connection_mode'.
 
         Returns:
             Tuple[bool, str, float]: Reachability boolean, status message, and roundtrip response latency in ms.
         """
-        ip = data.get("ip", "").strip()
+        mode = str(data.get("connection_mode", "")).lower()
+        ip = str(data.get("ip", "")).strip()
         port = int(data.get("port", 554))
+
+        # Check USB camera
+        if mode in ("usb", "webcam") or (ip.isdigit() and int(ip) < 10 and mode != "ip_rtsp"):
+            dev_idx = int(ip) if ip.isdigit() else 0
+            cam_id = data.get("id", "primary")
+            active_st = self._streams.get(cam_id)
+            if active_st and active_st.source == dev_idx:
+                fps = getattr(active_st, "current_fps", 0.0)
+                lat = getattr(active_st, "latency_ms", 12.0)
+                return True, f"USB Camera (Device Index {dev_idx}) is currently active and assigned to this stream ({fps:.1f} FPS)!", lat
+
+            t0 = time.perf_counter()
+            try:
+                import cv2
+                cap = cv2.VideoCapture(dev_idx)
+                if cap.isOpened():
+                    ret, frame = cap.read()
+                    cap.release()
+                    elapsed_ms = round((time.perf_counter() - t0) * 1000, 1)
+                    if ret and frame is not None:
+                        h, w = frame.shape[:2]
+                        return True, f"USB Camera (Device Index {dev_idx}) verified & active! Delivering {w}x{h} px video stream.", elapsed_ms
+                    return True, f"USB Camera (Device Index {dev_idx}) hardware device opened successfully.", elapsed_ms
+                else:
+                    return False, f"USB Device Index {dev_idx} could not be opened. Ensure camera is plugged into USB port.", 0.0
+            except Exception as e:
+                return False, f"USB camera probe error: {e}", 0.0
+
         return probe_ip_camera(ip, port, timeout_sec=2.5)
 
     def calculate_drone_gps(

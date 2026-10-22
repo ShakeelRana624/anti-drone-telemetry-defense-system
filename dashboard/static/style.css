@@ -2698,3 +2698,140 @@ img {
   flex-wrap: wrap;
   gap: 0.4rem;
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   CAMERA ORIENTATION & COMPASS BEARING SELECTOR
+   ══════════════════════════════════════════════════════════════════ */
+.cardinal-buttons-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.45rem;
+  margin-top: 0.35rem;
+  margin-bottom: 0.8rem;
+}
+
+.btn-cardinal-direction {
+  background: rgba(36, 15, 17, 0.7);
+  border: 1px solid rgba(243, 165, 173, 0.2);
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 0.45rem 0.3rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+}
+
+.btn-cardinal-direction:hover {
+  background: rgba(154, 30, 35, 0.35);
+  border-color: var(--color-accent);
+  color: var(--color-light);
+  transform: translateY(-1px);
+}
+
+.btn-cardinal-direction.active {
+  background: linear-gradient(135deg, rgba(231, 29, 54, 0.4), rgba(154, 30, 35, 0.6));
+  border-color: #ff4757;
+  color: #fff;
+  box-shadow: 0 0 12px rgba(255, 71, 87, 0.4);
+  font-weight: 700;
+}
+
+.btn-cardinal-direction .cardinal-deg {
+  font-size: 0.65rem;
+  opacity: 0.75;
+}
+
+/* Tactical Compass Visual Widget */
+.tactical-compass-widget {
+  background: rgba(18, 6, 7, 0.65);
+  border: 1px solid rgba(243, 165, 173, 0.18);
+  border-radius: var(--radius-sm);
+  padding: 0.85rem;
+  margin-top: 0.6rem;
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+}
+
+.compass-dial-container {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(36, 15, 17, 0.9) 0%, rgba(13, 4, 5, 0.95) 100%);
+  border: 2px solid rgba(243, 165, 173, 0.3);
+  box-shadow: 0 0 16px rgba(0, 0, 0, 0.8), inset 0 0 8px rgba(243, 165, 173, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.compass-dial-tick {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--color-dim);
+}
+.compass-dial-tick--n { top: 3px; left: 50%; transform: translateX(-50%); color: var(--color-accent); font-weight: 800; }
+.compass-dial-tick--e { right: 5px; top: 50%; transform: translateY(-50%); color: var(--status-ok); }
+.compass-dial-tick--s { bottom: 3px; left: 50%; transform: translateX(-50%); }
+.compass-dial-tick--w { left: 5px; top: 50%; transform: translateY(-50%); color: var(--color-accent); }
+
+.compass-needle {
+  position: absolute;
+  width: 3px;
+  height: 48px;
+  background: linear-gradient(to top, transparent 50%, #ff4757 50%);
+  border-radius: 2px;
+  transform-origin: center center;
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 0 8px rgba(255, 71, 87, 0.8);
+}
+
+.compass-needle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 9px solid #ff4757;
+}
+
+.compass-center-dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: var(--color-light);
+  border-radius: 50%;
+  border: 2px solid #ff4757;
+  z-index: 2;
+}
+
+.compass-info-readout {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 0.73rem;
+  line-height: 1.45;
+}
+
+.compass-info-readout h4 {
+  font-size: 0.82rem;
+  color: var(--color-light);
+  margin-bottom: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}

@@ -773,47 +773,165 @@
             </div>
 
             <div class="control-field">
-              <label for="cam-ip">Camera IP Address</label>
-              <input class="control-input" type="text" id="cam-ip" placeholder="192.168.1.101" />
-              <div class="form-hint">Local or WAN IP of your CCTV / IP camera.</div>
+              <label for="cam-mode">Connection Protocol / Interface</label>
+              <select class="control-select" id="cam-mode" onchange="onCameraModeChanged()">
+                <option value="usb" selected>🔌 USB Camera / Webcam (Direct Device Index)</option>
+                <option value="ip_rtsp">🌐 RTSP Stream (Standard CCTV / IP Security Camera)</option>
+                <option value="ip_http">📱 HTTP Stream (IP Webcam / Mobile App Stream)</option>
+                <option value="custom">📁 Custom Direct Stream URL or Video File</option>
+              </select>
+              <div class="form-hint">Select USB for cameras plugged into computer ports.</div>
             </div>
 
             <div class="control-field">
-              <label for="cam-port">RTSP / HTTP Port</label>
-              <input class="control-input" type="number" id="cam-port" placeholder="554" value="554" />
-              <div class="form-hint">Standard RTSP port is 554 (HTTP is 80 or 8080).</div>
-            </div>
-
-            <div class="control-field">
-              <label for="cam-mode">Connection Protocol</label>
-              <select class="control-select" id="cam-mode">
-                <option value="ip_rtsp" selected>RTSP Stream (Standard CCTV / IP Security Camera)</option>
-                <option value="ip_http">HTTP Stream (IP Webcam / Mobile App Stream)</option>
-                <option value="usb">USB Camera Index (Device 0 or 1)</option>
-                <option value="custom">Custom Direct Stream URL</option>
+              <label for="cam-sensor-type">Sensor Modality</label>
+              <select class="control-select" id="cam-sensor-type">
+                <option value="optical" selected>Optical Visible HD 1080p</option>
+                <option value="thermal">Thermal / FLIR Long-Wave Infrared</option>
               </select>
             </div>
 
-            <div class="control-field">
-              <label for="cam-path">RTSP Stream Path</label>
-              <input class="control-input" type="text" id="cam-path" placeholder="/stream1 or /h264Preview_01_main" />
-              <div class="form-hint">Stream path provided by your camera manufacturer (e.g. /stream1).</div>
+            <!-- USB Hardware Fields (Shown when USB is selected) -->
+            <div class="control-field form-group-full" id="usb-fields-group" style="background:rgba(255,255,255,0.03); border:1px solid rgba(243,165,173,0.15); border-radius:var(--radius-sm); padding:0.8rem;">
+              <label for="cam-usb-index" style="color:var(--color-accent); font-weight:700;">🔌 Select Camera Device (Manual Selection — No Auto-Switch)</label>
+              <select class="control-select" id="cam-usb-index" onchange="onUsbIndexChanged(this.value)">
+                <option value="1">External USB Camera (Device Index 1 — Plugged-in USB Webcam)</option>
+                <option value="0">Built-in Laptop Camera (Device Index 0 — Integrated Webcam)</option>
+                <option value="2">Secondary USB Device (Device Index 2)</option>
+                <option value="3">Tertiary USB Device (Device Index 3)</option>
+              </select>
+              <div class="form-hint" style="margin-top:0.35rem; color:var(--color-muted);">
+                ⚡ Choose whether to use your plugged-in external USB camera (Index 1) or your laptop webcam (Index 0). The system will strictly use your choice and will never automatically change it.
+              </div>
             </div>
 
-            <div class="control-field">
-              <label for="cam-user">Username (Optional)</label>
-              <input class="control-input" type="text" id="cam-user" placeholder="admin" />
+            <!-- IP Network Fields (Shown when RTSP/HTTP is selected) -->
+            <div id="ip-fields-group" class="form-group-full" style="display:none; width:100%;">
+              <div class="form-grid-2col" style="margin-bottom:0;">
+                <div class="control-field">
+                  <label for="cam-ip">Camera IP Address</label>
+                  <input class="control-input" type="text" id="cam-ip" placeholder="192.168.1.101" />
+                  <div class="form-hint">Local IP of CCTV / IP Camera.</div>
+                </div>
+
+                <div class="control-field">
+                  <label for="cam-port">RTSP / HTTP Port</label>
+                  <input class="control-input" type="number" id="cam-port" placeholder="554" value="554" />
+                  <div class="form-hint">Standard RTSP port is 554.</div>
+                </div>
+
+                <div class="control-field">
+                  <label for="cam-path">RTSP Stream Path</label>
+                  <input class="control-input" type="text" id="cam-path" placeholder="/stream1 or /live" />
+                </div>
+
+                <div class="control-field">
+                  <label for="cam-user">Username (Optional)</label>
+                  <input class="control-input" type="text" id="cam-user" placeholder="admin" />
+                </div>
+
+                <div class="control-field form-group-full">
+                  <label for="cam-pass">Password (Optional)</label>
+                  <input class="control-input" type="password" id="cam-pass" placeholder="Camera password" />
+                </div>
+              </div>
             </div>
 
-            <div class="control-field">
-              <label for="cam-pass">Password (Optional)</label>
-              <input class="control-input" type="password" id="cam-pass" placeholder="Camera password" />
+            <!-- ═══════════ COMPASS ORIENTATION & CARDINAL SIDE SECTION ═══════════ -->
+            <div class="control-field form-group-full" style="margin-top:0.4rem; background:rgba(26,10,11,0.6); border:1px solid rgba(243,165,173,0.22); border-radius:var(--radius-sm); padding:0.9rem;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem;">
+                <label style="color:var(--color-accent); font-weight:700; font-size:0.85rem; display:flex; align-items:center; gap:0.4rem;">
+                  <span>🧭</span> Camera Facing Direction &amp; Compass Side (Cardinal Orientation)
+                </label>
+                <span class="meta-pill" id="compass-badge-label" style="color:#ff4757; font-weight:700;">EAST (90.0°)</span>
+              </div>
+              <p style="font-size:0.73rem; color:var(--color-muted); margin-bottom:0.6rem;">
+                Select which side or direction your camera is physically pointed (East, West, North, South, etc.). The system calculates incoming drones' exact compass degrees and radar coordinates from this baseline.
+              </p>
+
+              <!-- Quick Cardinal Buttons Grid -->
+              <div class="cardinal-buttons-grid">
+                <button type="button" class="btn-cardinal-direction" data-deg="0" onclick="setCardinalSide(0, 'North (N)', this)">
+                  <span>NORTH</span>
+                  <span class="cardinal-deg">000.0°</span>
+                </button>
+                <button type="button" class="btn-cardinal-direction" data-deg="45" onclick="setCardinalSide(45, 'North-East (NE)', this)">
+                  <span>NORTH-EAST</span>
+                  <span class="cardinal-deg">045.0°</span>
+                </button>
+                <button type="button" class="btn-cardinal-direction active" data-deg="90" onclick="setCardinalSide(90, 'East (E)', this)">
+                  <span>EAST</span>
+                  <span class="cardinal-deg">090.0°</span>
+                </button>
+                <button type="button" class="btn-cardinal-direction" data-deg="135" onclick="setCardinalSide(135, 'South-East (SE)', this)">
+                  <span>SOUTH-EAST</span>
+                  <span class="cardinal-deg">135.0°</span>
+                </button>
+                <button type="button" class="btn-cardinal-direction" data-deg="180" onclick="setCardinalSide(180, 'South (S)', this)">
+                  <span>SOUTH</span>
+                  <span class="cardinal-deg">180.0°</span>
+                </button>
+                <button type="button" class="btn-cardinal-direction" data-deg="225" onclick="setCardinalSide(225, 'South-West (SW)', this)">
+                  <span>SOUTH-WEST</span>
+                  <span class="cardinal-deg">225.0°</span>
+                </button>
+                <button type="button" class="btn-cardinal-direction" data-deg="270" onclick="setCardinalSide(270, 'West (W)', this)">
+                  <span>WEST</span>
+                  <span class="cardinal-deg">270.0°</span>
+                </button>
+                <button type="button" class="btn-cardinal-direction" data-deg="315" onclick="setCardinalSide(315, 'North-West (NW)', this)">
+                  <span>NORTH-WEST</span>
+                  <span class="cardinal-deg">315.0°</span>
+                </button>
+              </div>
+
+              <!-- Degree & FOV Controls Row -->
+              <div class="form-grid-2col" style="margin-bottom:0;">
+                <div class="control-field">
+                  <label for="cam-azimuth">Exact Compass Angle (°)</label>
+                  <input class="control-input" type="number" min="0" max="359.9" step="0.5" id="cam-azimuth" value="90.0" oninput="onAzimuthDegreeChanged(this.value)" placeholder="90.0" />
+                  <div class="form-hint">Type custom angle (0.0° = North, 90.0° = East, 270.0° = West).</div>
+                </div>
+
+                <div class="control-field">
+                  <label for="cam-fov">Lens Field of View (FOV)</label>
+                  <select class="control-select" id="cam-fov" onchange="onFovChanged(this.value)">
+                    <option value="90" selected>90.0° (Standard Wide-Angle Lens)</option>
+                    <option value="78">78.0° (Standard USB Webcam / Laptop Cam)</option>
+                    <option value="60">60.0° (Narrow / Telephoto Zoom Lens)</option>
+                    <option value="120">120.0° (Ultra-Wide Aerial Fisheye)</option>
+                  </select>
+                  <div class="form-hint">Horizontal optical span of the camera lens.</div>
+                </div>
+              </div>
+
+              <!-- Real-time Tactical Compass Gauge -->
+              <div class="tactical-compass-widget">
+                <div class="compass-dial-container">
+                  <span class="compass-dial-tick compass-dial-tick--n">N</span>
+                  <span class="compass-dial-tick compass-dial-tick--e">E</span>
+                  <span class="compass-dial-tick compass-dial-tick--s">S</span>
+                  <span class="compass-dial-tick compass-dial-tick--w">W</span>
+                  <div class="compass-needle" id="compass-needle" style="transform: rotate(90deg);"></div>
+                  <div class="compass-center-dot"></div>
+                </div>
+                <div class="compass-info-readout">
+                  <h4><span id="compass-summary-cardinal">Facing EAST (090.0°)</span></h4>
+                  <div style="color:var(--color-muted);">
+                    Sector Coverage: <strong id="compass-coverage-sector" style="color:var(--color-light);">045.0° (NE) — 135.0° (SE)</strong>
+                  </div>
+                  <div style="color:var(--color-dim); margin-top:0.2rem; font-size:0.68rem;">
+                    Target Telemetry: <span style="color:#2ec4b6;">True Degree = Base Heading + Pixel Offset</span>
+                  </div>
+                </div>
+              </div>
             </div>
 
+            <!-- Base Station Location -->
             <div class="control-field form-group-full">
               <label for="cam-city">City / Base Station Location</label>
               <input class="control-input" type="text" id="cam-city" placeholder="Islamabad, Rawalpindi, Lahore, etc." />
-              <div class="form-hint">City where this camera sensor is deployed.</div>
+              <div class="form-hint">Geographic location where camera is installed.</div>
             </div>
 
             <div class="control-field">
@@ -827,23 +945,9 @@
             </div>
 
             <div class="control-field form-group-full">
-              <button class="btn-export" style="width:100%;" onclick="autoDetectLocation()">
+              <button type="button" class="btn-export" style="width:100%;" onclick="autoDetectLocation()">
                 <span>📍</span> Auto-Detect My Current GPS Location
               </button>
-            </div>
-
-            <div class="control-field">
-              <label for="cam-azimuth">Compass Heading / Azimuth (°)</label>
-              <input class="control-input" type="number" step="0.5" id="cam-azimuth" placeholder="45.0" />
-              <div class="form-hint">Direction camera faces (0° North, 90° East, 180° South).</div>
-            </div>
-
-            <div class="control-field">
-              <label for="cam-sensor-type">Sensor Modality</label>
-              <select class="control-select" id="cam-sensor-type">
-                <option value="optical" selected>Optical Visible HD 1080p</option>
-                <option value="thermal">Thermal / FLIR Long-Wave Infrared</option>
-              </select>
             </div>
           </div>
 
@@ -855,10 +959,10 @@
 
           <!-- Buttons -->
           <div style="display:flex; gap:0.8rem; margin-top:1.4rem;">
-            <button class="btn-export" style="flex:1;" onclick="testCameraProbe()">
-              <span>🔍</span> Test IP Connection
+            <button type="button" class="btn-export" style="flex:1;" id="btn-test-camera" onclick="testCameraProbe()">
+              <span>🔍</span> Test Camera Hardware
             </button>
-            <button class="btn-generate-report" style="flex:1.4;" onclick="saveCameraConfiguration()">
+            <button type="button" class="btn-generate-report" style="flex:1.4;" id="btn-save-camera" onclick="saveCameraConfiguration()">
               <span>💾</span> Save &amp; Apply Camera Config
             </button>
           </div>
@@ -1371,7 +1475,7 @@
     let radarSweepActive = true;
     let cameraBaseGPS = { lat: 33.684400, lon: 73.047900, heading: 90.0 };
 
-    function getCardinalDirection(deg) {
+    function getCardinalAbbr(deg) {
       const d = ((deg % 360) + 360) % 360;
       if (d >= 337.5 || d < 22.5) return 'N';
       if (d >= 22.5 && d < 67.5) return 'NE';
@@ -1381,6 +1485,14 @@
       if (d >= 202.5 && d < 247.5) return 'SW';
       if (d >= 247.5 && d < 292.5) return 'W';
       return 'NW';
+    }
+
+    function getCardinalDirection(angle) {
+      const dirs = ['North (N)', 'North-East (NE)', 'East (E)', 'South-East (SE)', 'South (S)', 'South-West (SW)', 'West (W)', 'North-West (NW)'];
+      let d = parseFloat(angle) || 0;
+      d = ((d % 360) + 360) % 360;
+      const index = Math.round(d / 45) % 8;
+      return dirs[index];
     }
 
     function updateTelemetryTable(t) {
@@ -2743,10 +2855,89 @@
     }
 
     // ═════════════════════════════════════════════════════════════
-    // CAMERA SETUP & IP / GPS CONFIGURATION (camera_int)
+    // CAMERA SETUP & IP / USB / COMPASS CONFIGURATION (camera_int)
     // ═════════════════════════════════════════════════════════════
     let activeCameraId = 'primary';
     let allCamerasData = {};
+
+    function onCameraModeChanged() {
+      const mode = document.getElementById('cam-mode').value;
+      const usbGroup = document.getElementById('usb-fields-group');
+      const ipGroup = document.getElementById('ip-fields-group');
+      const testBtn = document.getElementById('btn-test-camera');
+
+      if (mode === 'usb') {
+        if (usbGroup) usbGroup.style.display = 'block';
+        if (ipGroup) ipGroup.style.display = 'none';
+        if (testBtn) testBtn.innerHTML = '<span>🔌</span> Test USB Camera Hardware';
+      } else {
+        if (usbGroup) usbGroup.style.display = 'none';
+        if (ipGroup) ipGroup.style.display = 'block';
+        if (testBtn) testBtn.innerHTML = '<span>🔍</span> Test IP Connection';
+      }
+    }
+
+    function onUsbIndexChanged(val) {
+      const ipInput = document.getElementById('cam-ip');
+      if (ipInput) ipInput.value = val;
+    }
+
+    function setCardinalSide(deg, name, btn) {
+      const azInput = document.getElementById('cam-azimuth');
+      if (azInput) azInput.value = parseFloat(deg).toFixed(1);
+
+      document.querySelectorAll('.btn-cardinal-direction').forEach(b => b.classList.remove('active'));
+      if (btn) {
+        btn.classList.add('active');
+      } else {
+        const matchingBtn = document.querySelector(`.btn-cardinal-direction[data-deg="${Math.round(deg)}"]`);
+        if (matchingBtn) matchingBtn.classList.add('active');
+      }
+
+      updateCompassVisual(deg, name);
+      updateTelemetryDisplay({ azimuth_deg: deg });
+    }
+
+    function onAzimuthDegreeChanged(val) {
+      let deg = parseFloat(val) || 0;
+      deg = ((deg % 360) + 360) % 360;
+      const cardName = getCardinalDirection(deg);
+
+      document.querySelectorAll('.btn-cardinal-direction').forEach(b => {
+        const bDeg = parseFloat(b.getAttribute('data-deg'));
+        const diff = Math.min(Math.abs(bDeg - deg), 360 - Math.abs(bDeg - deg));
+        b.classList.toggle('active', diff < 15);
+      });
+
+      updateCompassVisual(deg, cardName);
+      updateTelemetryDisplay({ azimuth_deg: deg });
+    }
+
+    function onFovChanged(val) {
+      const deg = parseFloat(document.getElementById('cam-azimuth').value) || 90;
+      updateCompassVisual(deg, getCardinalDirection(deg));
+    }
+
+    function updateCompassVisual(deg, name) {
+      const needle = document.getElementById('compass-needle');
+      const badge = document.getElementById('compass-badge-label');
+      const summary = document.getElementById('compass-summary-cardinal');
+      const coverage = document.getElementById('compass-coverage-sector');
+      const fov = parseFloat(document.getElementById('cam-fov').value) || 90;
+
+      if (needle) needle.style.transform = `rotate(${deg}deg)`;
+      const cardShort = getCardinalAbbr(deg);
+      const textLabel = `${cardShort} (${parseFloat(deg).toFixed(1)}°)`;
+
+      if (badge) badge.textContent = textLabel;
+      if (summary) summary.textContent = `Facing ${name || getCardinalDirection(deg)} (${parseFloat(deg).toFixed(1)}°)`;
+
+      const minDeg = (((deg - fov / 2) % 360) + 360) % 360;
+      const maxDeg = (((deg + fov / 2) % 360) + 360) % 360;
+      if (coverage) {
+        coverage.textContent = `${minDeg.toFixed(1)}° (${getCardinalAbbr(minDeg)}) — ${maxDeg.toFixed(1)}° (${getCardinalAbbr(maxDeg)})`;
+      }
+    }
 
     async function loadCameraConfig() {
       try {
@@ -2766,7 +2957,6 @@
       document.querySelectorAll('.cam-tab-btn').forEach(b => b.classList.remove('active'));
       if (btn) btn.classList.add('active');
 
-      // Update preview video stream to chosen camera
       const previewImg = document.getElementById('setup-preview-img');
       if (previewImg) {
         previewImg.src = `/api/video_feed/${camId}?t=${Date.now()}`;
@@ -2785,119 +2975,150 @@
         sensorPill.textContent = (cam.sensor_type || (isCam1 ? 'optical' : 'thermal')).toUpperCase() + ' SENSOR';
       }
 
-      // Populate input values
-      document.getElementById('cam-name').value = cam.name || (isCam1 ? 'Camera 01 — North Perimeter' : 'Camera 02 — East Sector (Thermal)');
-      document.getElementById('cam-ip').value = cam.ip || (isCam1 ? '192.168.1.101' : '192.168.1.102');
+      const mode = cam.connection_mode || (isCam1 ? 'usb' : 'ip_rtsp');
+      document.getElementById('cam-mode').value = mode;
+
+      document.getElementById('cam-name').value = cam.name || (isCam1 ? 'Camera 01 — Optical HD (USB / Primary)' : 'Camera 02 — East Sector (Thermal)');
+      document.getElementById('cam-sensor-type').value = cam.sensor_type || (isCam1 ? 'optical' : 'thermal');
+
+      const rawIp = String(cam.ip !== undefined ? cam.ip : '0');
+      document.getElementById('cam-ip').value = rawIp;
+
+      const usbSelect = document.getElementById('cam-usb-index');
+      if (usbSelect) {
+        usbSelect.value = (rawIp.length === 1 && !isNaN(rawIp)) ? rawIp : '0';
+      }
+
       document.getElementById('cam-port').value = cam.port || 554;
-      document.getElementById('cam-mode').value = cam.connection_mode || 'ip_rtsp';
       document.getElementById('cam-path').value = cam.rtsp_path || (isCam1 ? '/stream1' : '/stream2');
       document.getElementById('cam-user').value = cam.username || 'admin';
       document.getElementById('cam-pass').value = cam.password || '';
       document.getElementById('cam-city').value = cam.city || (isCam1 ? 'Islamabad' : 'Rawalpindi');
       document.getElementById('cam-lat').value = cam.latitude !== undefined ? cam.latitude : (isCam1 ? 33.6844 : 33.5973);
       document.getElementById('cam-lon').value = cam.longitude !== undefined ? cam.longitude : 73.0479;
-      document.getElementById('cam-azimuth').value = cam.azimuth_deg !== undefined ? cam.azimuth_deg : (isCam1 ? 45.0 : 128.5);
-      document.getElementById('cam-sensor-type').value = cam.sensor_type || (isCam1 ? 'optical' : 'thermal');
 
-      // Update status badges
+      const az = cam.azimuth_deg !== undefined ? cam.azimuth_deg : (isCam1 ? 90.0 : 128.5);
+      document.getElementById('cam-azimuth').value = parseFloat(az).toFixed(1);
+
+      const fov = cam.fov_deg !== undefined ? cam.fov_deg : 90.0;
+      const fovSelect = document.getElementById('cam-fov');
+      if (fovSelect) fovSelect.value = String(Math.round(fov));
+
+      onCameraModeChanged();
+      setCardinalSide(az, getCardinalDirection(az));
+
       const statusBadge = document.getElementById('setup-conn-badge');
       const statusText = document.getElementById('setup-status-text');
       const isOnline = cam.is_online;
 
       if (isOnline) {
-        statusBadge.innerHTML = `<span class="status-indicator-tag status-indicator-tag--online"><span class="status-dot"></span> CONNECTED (${cam.latency_ms}ms)</span>`;
-        statusText.textContent = `Live IP Stream Active (${cam.current_fps} FPS)`;
+        statusBadge.innerHTML = `<span class="status-indicator-tag status-indicator-tag--online"><span class="status-dot"></span> CONNECTED (${cam.latency_ms || 12}ms)</span>`;
+        statusText.textContent = `Live Camera Stream Active (${cam.current_fps || 25} FPS)`;
       } else {
-        statusBadge.innerHTML = `<span class="status-indicator-tag status-indicator-tag--sim"><span class="status-dot status-dot--warn"></span> SIMULATION MODE</span>`;
-        statusText.textContent = `Awaiting Physical IP Link &bull; Tactical Simulation Active`;
+        statusBadge.innerHTML = `<span class="status-indicator-tag status-indicator-tag--sim"><span class="status-dot status-dot--warn"></span> STANDBY / READY</span>`;
+        statusText.textContent = mode === 'usb' ? `USB Device Ready &bull; Tactical Monitor Active` : `Awaiting IP Stream &bull; Tactical Monitor Active`;
       }
 
-      // Update Telemetry Display
       updateTelemetryDisplay(cam);
     }
 
     function updateTelemetryDisplay(cam) {
-      const city = cam.city || document.getElementById('cam-city').value || 'Station Alpha';
+      const city = cam.city || document.getElementById('cam-city').value || 'Islamabad';
       const lat = cam.latitude !== undefined ? cam.latitude : (document.getElementById('cam-lat').value || 33.6844);
       const lon = cam.longitude !== undefined ? cam.longitude : (document.getElementById('cam-lon').value || 73.0479);
-      const az = cam.azimuth_deg !== undefined ? cam.azimuth_deg : (document.getElementById('cam-azimuth').value || 45.0);
-      const ip = cam.ip || document.getElementById('cam-ip').value || '192.168.1.101';
+      const az = cam.azimuth_deg !== undefined ? cam.azimuth_deg : (document.getElementById('cam-azimuth').value || 90.0);
+      const mode = cam.connection_mode || document.getElementById('cam-mode').value || 'usb';
+      const ip = cam.ip !== undefined ? cam.ip : document.getElementById('cam-ip').value;
       const port = cam.port || document.getElementById('cam-port').value || '554';
       const path = cam.rtsp_path || document.getElementById('cam-path').value || '/stream1';
 
-      document.getElementById('geo-city-val').textContent = city;
-      document.getElementById('geo-coords-val').textContent = `${parseFloat(lat).toFixed(4)}° N, ${parseFloat(lon).toFixed(4)}° E`;
-      document.getElementById('geo-azimuth-val').textContent = `${parseFloat(az).toFixed(1)}° (${getCardinalDirection(az)})`;
-      document.getElementById('geo-rtsp-val').textContent = `rtsp://${ip}:${port}${path}`;
-      document.getElementById('geo-calc-sample').textContent = `${parseFloat(lat).toFixed(4)} N, ${parseFloat(lon).toFixed(4)} E`;
-    }
+      const cityEl = document.getElementById('geo-city-val');
+      if (cityEl) cityEl.textContent = city;
 
-    function getCardinalDirection(angle) {
-      const dirs = ['North (N)', 'North-East (NE)', 'East (E)', 'South-East (SE)', 'South (S)', 'South-West (SW)', 'West (W)', 'North-West (NW)'];
-      const index = Math.round(((parseFloat(angle) %= 360) < 0 ? angle + 360 : angle) / 45) % 8;
-      return dirs[index];
+      const coordsEl = document.getElementById('geo-coords-val');
+      if (coordsEl) coordsEl.textContent = `${parseFloat(lat).toFixed(4)}° N, ${parseFloat(lon).toFixed(4)}° E`;
+
+      const azEl = document.getElementById('geo-azimuth-val');
+      if (azEl) azEl.textContent = `${parseFloat(az).toFixed(1)}° (${getCardinalDirection(az)})`;
+
+      const rtspEl = document.getElementById('geo-rtsp-val');
+      if (rtspEl) {
+        rtspEl.textContent = mode === 'usb' ? `USB Device (Index ${ip || 0})` : `rtsp://${ip}:${port}${path}`;
+      }
+
+      const sampleEl = document.getElementById('geo-calc-sample');
+      if (sampleEl) sampleEl.textContent = `${parseFloat(lat).toFixed(4)} N, ${parseFloat(lon).toFixed(4)} E`;
     }
 
     async function testCameraProbe() {
-      const ip = document.getElementById('cam-ip').value.trim();
+      const mode = document.getElementById('cam-mode').value;
+      const ip = mode === 'usb' ? (document.getElementById('cam-usb-index').value || '0') : document.getElementById('cam-ip').value.trim();
       const port = parseInt(document.getElementById('cam-port').value) || 554;
       const alertBox = document.getElementById('probe-alert');
       const alertMsg = document.getElementById('probe-alert-msg');
       const alertIcon = document.getElementById('probe-alert-icon');
-
-      if (!ip) {
-        showToast('Please enter an IP address to test.');
-        return;
-      }
 
       alertBox.className = 'probe-result-alert show';
       alertBox.style.background = 'rgba(255, 159, 28, 0.2)';
       alertBox.style.borderColor = '#ff9f1c';
       alertBox.style.color = '#ffd166';
       alertIcon.textContent = '⏳';
-      alertMsg.textContent = `Probing ${ip}:${port} on local network...`;
+      alertMsg.textContent = mode === 'usb' ? `Verifying USB Camera device at Index ${ip}...` : `Probing ${ip}:${port} on local network...`;
 
       try {
         const res = await fetch('/api/camera/test', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ip, port })
+          body: JSON.stringify({ connection_mode: mode, ip: ip, port: port })
         });
         const data = await res.json();
 
         if (data.success) {
           alertBox.className = 'probe-result-alert show probe-result-alert--success';
           alertIcon.textContent = '✅';
-          alertMsg.textContent = `Connection Successful! ${data.message}`;
-          showToast(`Camera reached at ${ip}:${port} (${data.latency_ms}ms)!`);
+          alertMsg.textContent = `Hardware Verified! ${data.message}`;
+          showToast(`Camera connection test: ONLINE (${data.latency_ms}ms)`);
         } else {
           alertBox.className = 'probe-result-alert show probe-result-alert--error';
           alertIcon.textContent = '⚠️';
-          alertMsg.textContent = `Camera Not Reachable: ${data.message}. (Tactical simulator will remain active until camera is plugged into LAN).`;
-          showToast(`Camera connection test: Offline (${ip}:${port})`);
+          alertMsg.textContent = `Camera Check: ${data.message}`;
+          showToast(`Camera test: ${data.message}`);
         }
       } catch (err) {
         alertBox.className = 'probe-result-alert show probe-result-alert--error';
         alertIcon.textContent = '❌';
         alertMsg.textContent = `Probe error: ${err.message}`;
+        showToast(`Probe error: ${err.message}`);
       }
     }
 
     async function saveCameraConfiguration() {
+      const mode = document.getElementById('cam-mode').value;
+      const usbIdx = document.getElementById('cam-usb-index') ? document.getElementById('cam-usb-index').value : '0';
+      const ipVal = mode === 'usb' ? usbIdx : (document.getElementById('cam-ip').value.trim() || '192.168.1.101');
+      const portVal = mode === 'usb' ? 554 : (parseInt(document.getElementById('cam-port').value) || 554);
+      const pathVal = mode === 'usb' ? '' : document.getElementById('cam-path').value.trim();
+
+      const azVal = ((parseFloat(document.getElementById('cam-azimuth').value) || 90.0) % 360 + 360) % 360;
+      const fovVal = parseFloat(document.getElementById('cam-fov').value) || 90.0;
+      const latVal = parseFloat(document.getElementById('cam-lat').value) || 33.6844;
+      const lonVal = parseFloat(document.getElementById('cam-lon').value) || 73.0479;
+
       const payload = {
         id: activeCameraId,
-        name: document.getElementById('cam-name').value.trim(),
-        ip: document.getElementById('cam-ip').value.trim(),
-        port: parseInt(document.getElementById('cam-port').value) || 554,
-        connection_mode: document.getElementById('cam-mode').value,
-        rtsp_path: document.getElementById('cam-path').value.trim(),
+        name: document.getElementById('cam-name').value.trim() || 'Primary Defense Camera',
+        connection_mode: mode,
+        ip: ipVal,
+        port: portVal,
+        rtsp_path: pathVal,
         username: document.getElementById('cam-user').value.trim(),
         password: document.getElementById('cam-pass').value.trim(),
-        city: document.getElementById('cam-city').value.trim(),
-        latitude: parseFloat(document.getElementById('cam-lat').value) || 33.6844,
-        longitude: parseFloat(document.getElementById('cam-lon').value) || 73.0479,
-        azimuth_deg: parseFloat(document.getElementById('cam-azimuth').value) || 45.0,
-        sensor_type: document.getElementById('cam-sensor-type').value,
+        city: document.getElementById('cam-city').value.trim() || 'Islamabad',
+        latitude: latVal,
+        longitude: lonVal,
+        azimuth_deg: azVal,
+        fov_deg: fovVal,
+        sensor_type: document.getElementById('cam-sensor-type').value || 'optical',
         enabled: true
       };
 
@@ -2912,7 +3133,10 @@
         if (data.success) {
           allCamerasData[activeCameraId] = payload;
           updateTelemetryDisplay(payload);
-          showToast(`Configuration saved for ${payload.name}! Live stream reloaded.`);
+          updateCompassVisual(azVal, getCardinalDirection(azVal));
+
+          const cardName = getCardinalDirection(azVal);
+          showToast(`✅ Saved! Camera set to facing ${cardName} (${azVal.toFixed(1)}°). Live feed refreshed.`);
 
           // Refresh live feed preview
           const previewImg = document.getElementById('setup-preview-img');
@@ -2926,7 +3150,7 @@
             mainFeed.src = `/api/video_feed/${activeCameraId}?t=${Date.now()}`;
           }
         } else {
-          showToast(`Save failed: ${data.error}`);
+          showToast(`Save failed: ${data.error || 'Server error'}`);
         }
       } catch (err) {
         showToast(`Save failed: ${err.message}`);

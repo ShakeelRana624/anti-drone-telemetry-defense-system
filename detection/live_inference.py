@@ -124,9 +124,53 @@ class LiveDroneInferenceEngine:
         self._last_push_time: Dict[str, float] = {}
         self._locked_announced: Dict[str, bool] = {}
 
+        # Event-triggered Forensic Evidence Video Recording (ONLY on drone detection)
+        from collections import deque
+        from logging_system.evidence_recorder import EvidenceRecorder
+        self.evidence_recorder = EvidenceRecorder()
+        self._frame_buffer = deque(maxlen=75)
+        self._last_evidence_time = 0.0
+        self._evidence_cooldown_sec = 20.0
+
     def set_telemetry_callback(self, callback) -> None:
         """Register a callback function to receive real-time target telemetry payloads."""
         self._telemetry_callback = callback
+
+    def update_camera_params(
+        self,
+        heading: Optional[float] = None,
+        lat: Optional[float] = None,
+        lon: Optional[float] = None,
+        fov_h: Optional[float] = None,
+    ) -> None:
+        """
+        Dynamically update camera compass heading, geo-coordinates, and FOV across all tracking submodules.
+        """
+        with self._lock:
+            if heading is not None:
+                try:
+                    self.camera_heading = float(heading) % 360.0
+                    self.bearing_calculator.camera_heading = self.camera_heading
+                    logger.info("LiveInference updated camera heading: %.1f deg", self.camera_heading)
+                except (ValueError, TypeError):
+                    pass
+            if lat is not None or lon is not None:
+                try:
+                    if lat is not None:
+                        self.cam_lat = float(lat)
+                    if lon is not None:
+                        self.cam_lon = float(lon)
+                    self.dist_estimator.set_camera_gps(self.cam_lat, self.cam_lon)
+                    logger.info("LiveInference updated camera GPS: (%.6f, %.6f)", self.cam_lat, self.cam_lon)
+                except (ValueError, TypeError):
+                    pass
+            if fov_h is not None:
+                try:
+                    self.bearing_calculator._fov_h = float(fov_h)
+                    self.dist_estimator._fov_h = float(fov_h)
+                    self.dist_estimator._focal_px = self.dist_estimator._compute_focal_px()
+                except (ValueError, TypeError):
+                    pass
 
     def process_frame(self, frame: np.ndarray, camera_id: str = "primary") -> np.ndarray:
         """
@@ -138,6 +182,7 @@ class LiveDroneInferenceEngine:
 
         with self._lock:
             self.frame_idx += 1
+            self._frame_buffer.append(frame.copy())
             now = time.time()
             t0 = time.perf_counter()
 
@@ -331,6 +376,36 @@ class LiveDroneInferenceEngine:
                     if first_lock:
                         self._locked_announced[tgt_id_str] = True
 
+                        # Trigger forensic evidence video clip ONLY on drone detection lock
+                        now_ev = time.time()
+                        if now_ev - self._last_evidence_time >= self._evidence_cooldown_sec:
+                            self._last_evidence_time = now_ev
+                            buffered_snap = list(self._frame_buffer)
+                            det_snap = list(active_targets)
+                            brg_snap = float(true_brg)
+                            c_id_snap = str(camera_id)
+                            gps_snap = (self.cam_lat, self.cam_lon)
+                            out_frame_snap = out_frame.copy()
+
+                            def _record_task():
+                                try:
+                                    logger.warning("🎬 Drone target %s confirmed: Recording forensic MP4 evidence clip...", tgt_id_str)
+                                    self.evidence_recorder.record_evidence_clip(
+                                        base_frame=out_frame_snap,
+                                        detections=det_snap,
+                                        camera_id=c_id_snap,
+                                        bearing_deg=brg_snap,
+                                        gps_coords=gps_snap,
+                                        city="Sector Alpha",
+                                        duration_sec=5.0,
+                                        fps=20,
+                                        frames=buffered_snap if len(buffered_snap) >= 15 else None
+                                    )
+                                except Exception as ev_err:
+                                    logger.error("Failed to record evidence clip: %s", ev_err)
+
+                            threading.Thread(target=_record_task, daemon=True, name=f"evid-{tgt_id_str}").start()
+
                     # Throttle regular telemetry to ~7 Hz (every 0.14s) to keep SSE smooth and responsive
                     if first_lock or (now_t - last_push) >= 0.14:
                         self._last_push_time[tgt_id_str] = now_t
@@ -350,8 +425,8 @@ class LiveDroneInferenceEngine:
                             "ground_distance_m": round(float(gps_data["ground_distance_m"]), 1),
                             "drone_altitude_m": round(float(gps_data["drone_altitude_m"]), 1),
                             "altitude_m": round(float(gps_data["drone_altitude_m"]), 1),
-                            "drone_lat": round(float(gps_data["drone_latitude"]), 6),
-                            "drone_lon": round(float(gps_data["drone_longitude"]), 6),
+                            "drone_lat": round(float(gps_data.get("drone_lat", gps_data.get("drone_latitude", 0.0))), 6),
+                            "drone_lon": round(float(gps_data.get("drone_lon", gps_data.get("drone_longitude", 0.0))), 6),
                             "speed_kmh": round(float(gps_data.get("speed_kmh", 0.0)), 1),
                             "speed_mps": round(float(gps_data.get("speed_mps", 0.0)), 1),
                             "motion_state": gps_data.get("motion_state", "HOVERING"),

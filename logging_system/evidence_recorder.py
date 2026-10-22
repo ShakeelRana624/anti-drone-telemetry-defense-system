@@ -48,7 +48,6 @@ class EvidenceRecorder:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.catalog_path = self.output_dir / "evidence_catalog.json"
         self._lock = threading.Lock()
-        self._ensure_sample_evidence()
 
     def record_evidence_clip(
         self,
@@ -336,32 +335,8 @@ class EvidenceRecorder:
         return []
 
     def _ensure_sample_evidence(self) -> None:
-        """Pre-generate 2 baseline forensic evidence recordings if directory is empty."""
-        catalog = self._load_catalog()
-        if not catalog:
-            logger.info("Initializing baseline forensic evidence recordings...")
-            dummy_img = np.zeros((360, 640, 3), dtype=np.uint8)
-            dummy_img[:, :] = (18, 10, 28)
-            self.record_evidence_clip(
-                base_frame=dummy_img,
-                detections=[{"class": "drone", "confidence": 0.96}],
-                camera_id="primary",
-                bearing_deg=45.2,
-                gps_coords=(33.6844, 73.0479),
-                city="Islamabad",
-                duration_sec=5.0,
-            )
-            dummy_img2 = np.zeros((360, 640, 3), dtype=np.uint8)
-            dummy_img2[:, :] = (24, 12, 18)
-            self.record_evidence_clip(
-                base_frame=dummy_img2,
-                detections=[{"class": "drone", "confidence": 0.94}],
-                camera_id="secondary",
-                bearing_deg=128.5,
-                gps_coords=(33.5973, 73.0479),
-                city="Rawalpindi",
-                duration_sec=5.0,
-            )
+        """Disabled: Evidence clips are strictly recorded only when an actual drone is detected."""
+        pass
 
     def get_video_path(self, filename: str) -> Optional[Path]:
         """
