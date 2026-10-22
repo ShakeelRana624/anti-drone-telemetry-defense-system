@@ -124,13 +124,24 @@ class LiveDroneInferenceEngine:
         self._last_push_time: Dict[str, float] = {}
         self._locked_announced: Dict[str, bool] = {}
 
-        # Event-triggered Forensic Evidence Video Recording (ONLY on drone detection)
+        # Event-triggered Forensic Evidence Video Recording (ONLY on drone detection, strictly 1 clip)
         from collections import deque
-        from logging_system.evidence_recorder import EvidenceRecorder
-        self.evidence_recorder = EvidenceRecorder()
+        from logging_system.evidence_recorder import get_evidence_recorder
+        self.evidence_recorder = get_evidence_recorder()
         self._frame_buffer = deque(maxlen=75)
         self._last_evidence_time = 0.0
-        self._evidence_cooldown_sec = 20.0
+
+    def reset_session(self) -> None:
+        """Reset live tracking states and re-arm evidence recorder on camera configuration."""
+        with self._lock:
+            self._locked_announced.clear()
+            self._last_push_time.clear()
+            self.last_active_targets.clear()
+            self._frame_buffer.clear()
+            self._last_evidence_time = 0.0
+            from logging_system.evidence_recorder import EvidenceRecorder
+            EvidenceRecorder.reset_session()
+            logger.info("LiveInferenceEngine session reset.")
 
     def set_telemetry_callback(self, callback) -> None:
         """Register a callback function to receive real-time target telemetry payloads."""
@@ -376,10 +387,9 @@ class LiveDroneInferenceEngine:
                     if first_lock:
                         self._locked_announced[tgt_id_str] = True
 
-                        # Trigger forensic evidence video clip ONLY on drone detection lock
-                        now_ev = time.time()
-                        if now_ev - self._last_evidence_time >= self._evidence_cooldown_sec:
-                            self._last_evidence_time = now_ev
+                        # Trigger forensic evidence video clip ONLY on drone detection lock (strictly 1 clip per session)
+                        from logging_system.evidence_recorder import EvidenceRecorder
+                        if not EvidenceRecorder._session_recorded:
                             buffered_snap = list(self._frame_buffer)
                             det_snap = list(active_targets)
                             brg_snap = float(true_brg)
@@ -389,7 +399,7 @@ class LiveDroneInferenceEngine:
 
                             def _record_task():
                                 try:
-                                    logger.warning("🎬 Drone target %s confirmed: Recording forensic MP4 evidence clip...", tgt_id_str)
+                                    logger.warning("🎬 Drone target %s confirmed: Recording single forensic MP4 evidence clip...", tgt_id_str)
                                     self.evidence_recorder.record_evidence_clip(
                                         base_frame=out_frame_snap,
                                         detections=det_snap,

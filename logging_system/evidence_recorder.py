@@ -36,6 +36,9 @@ CATALOG_PATH = EVIDENCE_DIR / "evidence_catalog.json"
 class EvidenceRecorder:
     """Records, watermarks, and catalogs forensic MP4 evidence video clips."""
 
+    _session_recorded_lock = threading.Lock()
+    _session_recorded = False
+
     def __init__(self, output_dir: Optional[Path] = None) -> None:
         """
         Initialize the EvidenceRecorder subsystem.
@@ -48,6 +51,30 @@ class EvidenceRecorder:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.catalog_path = self.output_dir / "evidence_catalog.json"
         self._lock = threading.Lock()
+
+    @classmethod
+    def reset_session(cls) -> None:
+        """Reset session to allow recording 1 new clip on next confirmed drone detection."""
+        with cls._session_recorded_lock:
+            cls._session_recorded = False
+            logger.info("🎬 EvidenceRecorder session re-armed. Next drone detection will record 1 clip.")
+
+    def clear_evidence(self) -> None:
+        """Clear all cataloged evidence items and archived video clips, and re-arm session."""
+        with self._lock:
+            EvidenceRecorder.reset_session()
+            try:
+                if self.catalog_path.exists():
+                    self.catalog_path.unlink()
+                import shutil
+                for item in self.output_dir.iterdir():
+                    if item.is_dir() and item.name.startswith("202"):
+                        shutil.rmtree(item, ignore_errors=True)
+                    elif item.is_file() and (item.suffix in (".mp4", ".jpg") or item.name == "evidence_catalog.json"):
+                        item.unlink(missing_ok=True)
+                logger.info("Cleared all evidence videos and catalog.")
+            except Exception as e:
+                logger.warning("Error clearing evidence: %s", e)
 
     def record_evidence_clip(
         self,
@@ -63,21 +90,13 @@ class EvidenceRecorder:
     ) -> Dict[str, Any]:
         """
         Synthesize or encode an annotated forensic evidence video clip.
-
-        Args:
-            base_frame (np.ndarray): Primary image frame representing the incident.
-            detections (List[Any]): List of active/confirmed detections with bounding boxes.
-            camera_id (str): Identifier for the recording camera source.
-            bearing_deg (float): True compass bearing or relative azimuth angle in degrees.
-            gps_coords (Tuple[float, float]): (Latitude, Longitude) of the reporting camera.
-            city (str): City or operational base sector label.
-            duration_sec (float): Target duration of the clip in seconds.
-            fps (int): Frame rate for video encoding.
-            frames (Optional[List[np.ndarray]]): Optional buffer of historical frames to encode.
-
-        Returns:
-            Dict[str, Any]: Catalog metadata entry for the generated evidence clip.
+        Strictly enforces a 1-video policy per intrusion session.
         """
+        with EvidenceRecorder._session_recorded_lock:
+            if EvidenceRecorder._session_recorded:
+                logger.info("🎬 Forensic evidence clip already recorded for this intrusion session (strictly 1 clip policy). Skipping duplicate.")
+                return {}
+            EvidenceRecorder._session_recorded = True
         now = datetime.now()
         date_folder = self.output_dir / now.strftime("%Y-%m-%d")
         date_folder.mkdir(parents=True, exist_ok=True)
@@ -360,3 +379,17 @@ class EvidenceRecorder:
             if found.is_file():
                 return found
         return None
+
+
+# Module-level singleton provider
+_evidence_recorder_instance: Optional[EvidenceRecorder] = None
+_evidence_instance_lock = threading.Lock()
+
+
+def get_evidence_recorder(output_dir: Optional[Path] = None) -> EvidenceRecorder:
+    """Retrieve or initialize the global EvidenceRecorder singleton instance."""
+    global _evidence_recorder_instance
+    with _evidence_instance_lock:
+        if _evidence_recorder_instance is None:
+            _evidence_recorder_instance = EvidenceRecorder(output_dir)
+        return _evidence_recorder_instance

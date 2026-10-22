@@ -111,9 +111,9 @@
           <span class="kpi-card__title">Total Detections</span>
           <div class="kpi-card__icon">🎯</div>
         </div>
-        <div class="kpi-card__value" id="kpi-total">1,420</div>
+        <div class="kpi-card__value" id="kpi-total">0</div>
         <div class="kpi-card__sub">
-          <span class="kpi-card__trend">+12.4%</span> vs previous cycle
+          <span class="kpi-card__trend">POST-CONFIG SESSION</span>
         </div>
       </div>
 
@@ -122,9 +122,9 @@
           <span class="kpi-card__title">Today Incursions</span>
           <div class="kpi-card__icon">⚡</div>
         </div>
-        <div class="kpi-card__value" id="kpi-today">14</div>
+        <div class="kpi-card__value" id="kpi-today">0</div>
         <div class="kpi-card__sub">
-          <span class="kpi-card__trend kpi-card__trend--up">ACTIVE ALERT</span> 3 in last 2 hrs
+          <span class="kpi-card__trend kpi-card__trend--up">ACTIVE DEFENSE</span> 0 in current cycle
         </div>
       </div>
 
@@ -625,11 +625,11 @@
           <div class="report-kpi-grid">
             <div class="report-kpi-box">
               <label>Total Incursions</label>
-              <span id="rep-kpi-total">48</span>
+              <span id="rep-kpi-total">0</span>
             </div>
             <div class="report-kpi-box">
               <label>High Threat Count</label>
-              <span id="rep-kpi-high" style="color:#ff6b81;">12</span>
+              <span id="rep-kpi-high" style="color:#ff6b81;">0</span>
             </div>
             <div class="report-kpi-box">
               <label>Neutralized Rate</label>
@@ -1513,6 +1513,18 @@
         es.onmessage = (e) => {
           try {
             const data = JSON.parse(e.data);
+
+            if (data.total_detections !== undefined) {
+              const kpiTotal = document.getElementById('kpi-total');
+              if (kpiTotal) kpiTotal.textContent = Number(data.total_detections).toLocaleString();
+              const repTotal = document.getElementById('rep-kpi-total');
+              if (repTotal) repTotal.textContent = Number(data.total_detections).toLocaleString();
+            }
+            if (data.today_detections !== undefined) {
+              const kpiToday = document.getElementById('kpi-today');
+              if (kpiToday) kpiToday.textContent = Number(data.today_detections).toLocaleString();
+            }
+
             if (data.event === 'detection' || data.event === 'telemetry') {
               // Real-Time Telemetry Table & Tactical Radar Update
               updateTelemetryTable(data);
@@ -1558,11 +1570,29 @@
                   document.querySelectorAll('.rf-unit-card').forEach(c => c.classList.remove('active-alert'));
                 }, 4000);
 
-                // Prepend newly captured evidence video
-                setTimeout(loadEvidenceVideos, 1500);
+                // Prepend newly captured evidence video and refresh live charts/reports
+                setTimeout(() => {
+                  loadEvidenceVideos();
+                  loadSnapshotsGallery();
+                  initPlotlyCharts();
+                  generateReport();
+                }, 1500);
               }
             } else if (data.event === 'telemetry_clear') {
               clearLiveTelemetryAndRadar(true);
+              const kpiTotal = document.getElementById('kpi-total');
+              if (kpiTotal) kpiTotal.textContent = '0';
+              const kpiToday = document.getElementById('kpi-today');
+              if (kpiToday) kpiToday.textContent = '0';
+              const repTotal = document.getElementById('rep-kpi-total');
+              if (repTotal) repTotal.textContent = '0';
+              const repHigh = document.getElementById('rep-kpi-high');
+              if (repHigh) repHigh.textContent = '0';
+              const eventList = document.getElementById('event-logs-list');
+              if (eventList) eventList.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:12px;">No detections recorded. System clear.</div>';
+              loadEvidenceVault();
+              initPlotlyCharts();
+              generateReport();
             }
           } catch (err) {
             console.error('SSE Message parsing error:', err);
@@ -2029,9 +2059,9 @@
 
     async function initPlotlyCharts() {
       await renderMainTimelineChart();
-      renderThreatCompositionChart();
-      renderBearingPolarChart();
-      renderHourlyHeatmapChart();
+      await renderThreatCompositionChart();
+      await renderBearingPolarChart();
+      await renderHourlyHeatmapChart();
       renderCapabilityRadarChart();
     }
 
@@ -2192,133 +2222,130 @@
     }
 
     // ── 2. Threat Composition Donut ─────────────────────────────
-    function renderThreatCompositionChart() {
+    async function renderThreatCompositionChart() {
       const container = document.getElementById('plotly-threat-composition');
       if (!container) return;
 
-      let values, labels, colors;
-      if (activeCameraFilter === 'primary') {
-        values = [68, 18, 10, 4];
-        labels = ['Optical Quadcopters (DJI/Autel)', 'Fixed-Wing Scout', 'FPV Micro Drone', 'Unclassified'];
-        colors = [THEME.accent, THEME.secondary, THEME.primary, '#4D2327'];
-      } else if (activeCameraFilter === 'secondary') {
-        values = [32, 28, 30, 10];
-        labels = ['Thermal Signature FPVs', 'High-Speed Fixed Wing', 'Quadcopter Night Flights', 'Stealth/Hot Exhaust'];
-        colors = [THEME.secondary, '#d90429', THEME.accent, '#4D2327'];
-      } else {
-        values = [54, 24, 16, 6];
-        labels = ['Quadcopter (DJI/Autel)', 'Fixed-Wing Scout', 'FPV Micro Drone', 'Unclassified / Stealth'];
-        colors = [THEME.primary, THEME.secondary, THEME.accent, '#4D2327'];
+      try {
+        const r = await fetch(`/api/analytics/monthly?camera=${activeCameraFilter}`);
+        const data = await r.json();
+        const comp = data.composition || { quadcopter: 0, fixed_wing: 0, fpv_micro: 0, unclassified: 0 };
+        const total = (comp.quadcopter || 0) + (comp.fixed_wing || 0) + (comp.fpv_micro || 0) + (comp.unclassified || 0);
+
+        let values, labels, colors;
+        if (total === 0) {
+          values = [1];
+          labels = ['No Incursions Recorded'];
+          colors = ['rgba(77, 35, 39, 0.4)'];
+        } else {
+          values = [comp.quadcopter || 0, comp.fixed_wing || 0, comp.fpv_micro || 0, comp.unclassified || 0];
+          labels = ['Quadcopter (DJI/Autel)', 'Fixed-Wing Scout', 'FPV Micro Drone', 'Unclassified'];
+          colors = [THEME.accent, THEME.secondary, THEME.primary, '#4D2327'];
+        }
+
+        const plotData = [{
+          values: values,
+          labels: labels,
+          type: 'pie',
+          hole: 0.58,
+          marker: { colors: colors },
+          textinfo: total === 0 ? 'label' : 'percent',
+          insidetextfont: { color: THEME.light, family: 'Poppins', size: 10 }
+        }];
+
+        const layout = {
+          ...plotlyLayoutBase,
+          showlegend: total > 0,
+          margin: { l: 15, r: 15, t: 15, b: 15 }
+        };
+
+        Plotly.newPlot(container, plotData, layout, { responsive: true, displayModeBar: false });
+      } catch (err) {
+        console.error('Threat composition chart error:', err);
       }
-
-      const data = [{
-        values: values,
-        labels: labels,
-        type: 'pie',
-        hole: 0.58,
-        marker: { colors: colors },
-        textinfo: 'percent',
-        insidetextfont: { color: THEME.light, family: 'Poppins', size: 10 }
-      }];
-
-      const layout = {
-        ...plotlyLayoutBase,
-        showlegend: true,
-        margin: { l: 15, r: 15, t: 15, b: 15 }
-      };
-
-      Plotly.newPlot(container, data, layout, { responsive: true, displayModeBar: false });
     }
 
     // ── 3. 360° Polar Bearing Radar ─────────────────────────────
-    function renderBearingPolarChart() {
+    async function renderBearingPolarChart() {
       const container = document.getElementById('plotly-bearing-polar');
       if (!container) return;
 
-      let rValues;
-      if (activeCameraFilter === 'primary') {
-        // Concentrated in North / North-East (0° to 90°)
-        rValues = [55, 68, 30, 10, 5, 8, 20, 45, 55];
-      } else if (activeCameraFilter === 'secondary') {
-        // Concentrated in East / South-East (90° to 180°)
-        rValues = [8, 15, 62, 45, 38, 35, 18, 10, 8];
-      } else {
-        // Composite 360°
-        rValues = [45, 62, 38, 22, 19, 32, 40, 52, 45];
-      }
+      try {
+        const r = await fetch(`/api/analytics/monthly?camera=${activeCameraFilter}`);
+        const data = await r.json();
+        const bearings = data.bearings || [0, 0, 0, 0, 0, 0, 0, 0];
+        const rValues = [...bearings, bearings[0]];
 
-      const data = [{
-        type: 'scatterpolar',
-        r: rValues,
-        theta: [0, 45, 90, 135, 180, 225, 270, 315, 360],
-        fill: 'toself',
-        fillcolor: activeCameraFilter === 'secondary' ? 'rgba(154, 30, 35, 0.3)' : 'rgba(243, 165, 173, 0.22)',
-        line: { color: activeCameraFilter === 'secondary' ? THEME.secondary : THEME.accent, width: 2.5 },
-        marker: { color: activeCameraFilter === 'secondary' ? THEME.accent : THEME.secondary, size: 6 }
-      }];
+        const plotData = [{
+          type: 'scatterpolar',
+          r: rValues,
+          theta: [0, 45, 90, 135, 180, 225, 270, 315, 360],
+          fill: 'toself',
+          fillcolor: activeCameraFilter === 'secondary' ? 'rgba(154, 30, 35, 0.3)' : 'rgba(243, 165, 173, 0.22)',
+          line: { color: activeCameraFilter === 'secondary' ? THEME.secondary : THEME.accent, width: 2.5 },
+          marker: { color: activeCameraFilter === 'secondary' ? THEME.accent : THEME.secondary, size: 6 }
+        }];
 
-      const layout = {
-        paper_bgcolor: 'rgba(0,0,0,0)',
-        plot_bgcolor:  'rgba(0,0,0,0)',
-        font: { family: 'Poppins', color: THEME.muted, size: 10 },
-        margin: { l: 30, r: 30, t: 25, b: 25 },
-        polar: {
-          bgcolor: 'rgba(26, 10, 11, 0.5)',
-          radialaxis: {
-            visible: true,
-            gridcolor: 'rgba(243, 165, 173, 0.12)',
-            color: THEME.dim,
-            angle: 45
-          },
-          angularaxis: {
-            gridcolor: 'rgba(243, 165, 173, 0.15)',
-            color: THEME.muted,
-            direction: 'clockwise'
+        const layout = {
+          paper_bgcolor: 'rgba(0,0,0,0)',
+          plot_bgcolor:  'rgba(0,0,0,0)',
+          font: { family: 'Poppins', color: THEME.muted, size: 10 },
+          margin: { l: 30, r: 30, t: 25, b: 25 },
+          polar: {
+            bgcolor: 'rgba(26, 10, 11, 0.5)',
+            radialaxis: {
+              visible: true,
+              gridcolor: 'rgba(243, 165, 173, 0.12)',
+              color: THEME.dim,
+              angle: 45
+            },
+            angularaxis: {
+              gridcolor: 'rgba(243, 165, 173, 0.15)',
+              color: THEME.muted,
+              direction: 'clockwise'
+            }
           }
-        }
-      };
+        };
 
-      Plotly.newPlot(container, data, layout, { responsive: true, displayModeBar: false });
+        Plotly.newPlot(container, plotData, layout, { responsive: true, displayModeBar: false });
+      } catch (err) {
+        console.error('Bearing polar chart error:', err);
+      }
     }
 
     // ── 4. 24-Hour Peak Incursions ──────────────────────────────
-    function renderHourlyHeatmapChart() {
+    async function renderHourlyHeatmapChart() {
       const container = document.getElementById('plotly-hourly-heatmap');
       if (!container) return;
 
-      const hours = Array.from({length:24}, (_, i) => `${i.toString().padStart(2, '0')}:00`);
-      let counts;
+      try {
+        const hours = Array.from({length:24}, (_, i) => `${i.toString().padStart(2, '0')}:00`);
+        const r = await fetch(`/api/analytics/monthly?camera=${activeCameraFilter}`);
+        const data = await r.json();
+        const counts = data.hourly || Array(24).fill(0);
 
-      if (activeCameraFilter === 'primary') {
-        // Daylight peak for Camera 01 (10:00 - 16:00)
-        counts = [1, 0, 0, 0, 2, 4, 7, 12, 16, 11, 9, 10, 8, 7, 9, 11, 12, 10, 8, 6, 4, 3, 2, 1];
-      } else if (activeCameraFilter === 'secondary') {
-        // Dusk & night peak for Camera 02 (17:00 - 23:00)
-        counts = [2, 2, 1, 1, 2, 3, 2, 2, 2, 1, 1, 1, 1, 1, 4, 4, 7, 14, 13, 11, 8, 5, 3, 3];
-      } else {
-        // Combined
-        counts = [3, 2, 1, 1, 4, 7, 9, 14, 18, 12, 10, 11, 9, 8, 13, 15, 19, 24, 21, 17, 12, 8, 5, 4];
+        const colors = counts.map(v => v > 10 ? THEME.accent : (v > 3 ? THEME.secondary : 'rgba(154, 30, 35, 0.35)'));
+
+        const plotData = [{
+          x: hours,
+          y: counts,
+          type: 'bar',
+          marker: { color: colors }
+        }];
+
+        const layout = {
+          ...plotlyLayoutBase,
+          xaxis: {
+            ...plotlyLayoutBase.xaxis,
+            tickangle: -45,
+            nticks: 12
+          }
+        };
+
+        Plotly.newPlot(container, plotData, layout, { responsive: true, displayModeBar: false });
+      } catch (err) {
+        console.error('Hourly heatmap chart error:', err);
       }
-
-      const colors = counts.map(v => v > 14 ? THEME.accent : (v > 7 ? THEME.secondary : THEME.primary));
-
-      const data = [{
-        x: hours,
-        y: counts,
-        type: 'bar',
-        marker: { color: colors }
-      }];
-
-      const layout = {
-        ...plotlyLayoutBase,
-        xaxis: {
-          ...plotlyLayoutBase.xaxis,
-          tickangle: -45,
-          nticks: 12
-        }
-      };
-
-      Plotly.newPlot(container, data, layout, { responsive: true, displayModeBar: false });
     }
 
     // ── 5. Capability Radar Spider ──────────────────────────────
@@ -2576,29 +2603,40 @@
       const container = document.getElementById('snapshot-gallery-container');
       if (!container) return;
 
-      const sampleSnapshots = [
-        { title: 'Quadcopter Incursion #481', time: 'Today 21:28', cam: 'CAM 01 (Optical HD)', alt: '118m' },
-        { title: 'Fixed-Wing Recon UAV #480', time: 'Today 19:45', cam: 'CAM 01 (Optical HD)', alt: '240m' },
-        { title: 'Micro-FPV Perimeter Breach', time: 'Today 18:12', cam: 'CAM 01 (Optical HD)', alt: '85m' },
-        { title: 'Commercial Drone Night Recon', time: 'Yesterday 23:10', cam: 'CAM 01 (Optical HD)', alt: '160m' },
-        { title: 'Tactical UAS Track Alpha', time: 'Yesterday 17:35', cam: 'CAM 01 (Optical HD)', alt: '195m' },
-        { title: 'Multi-Rotor Hover Threat', time: '01 Oct 16:20', cam: 'CAM 01 (Optical HD)', alt: '140m' },
-      ];
+      try {
+        const res = await fetch('/api/evidence/list');
+        const data = await res.json();
+        const items = data.evidence || [];
 
-      container.innerHTML = '';
-      sampleSnapshots.forEach((snap) => {
-        const card = document.createElement('div');
-        card.className = 'gallery-card';
-        card.innerHTML = `
-          <img class="gallery-card__img" src="/api/video_feed/primary" alt="${snap.title}" />
-          <div class="gallery-card__footer">
-            <span style="font-weight:600; color:var(--color-light);">${snap.title}</span>
-            <span style="color:var(--color-accent); font-family:var(--font-mono); font-size:0.7rem;">${snap.time}</span>
-          </div>
-        `;
-        card.addEventListener('click', () => openLightbox('/api/video_feed/primary', `${snap.title} — ${snap.cam}`));
-        container.appendChild(card);
-      });
+        if (items.length === 0) {
+          container.innerHTML = `
+            <div style="grid-column:1/-1; padding:2rem; text-align:center; color:var(--color-muted); background:var(--color-dark-card); border-radius:var(--radius-md); border:1px dashed var(--color-border);">
+              <span>📷</span> No forensic snapshots captured yet. Targets detected during flight will be cataloged here.
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = '';
+        items.forEach((item) => {
+          const card = document.createElement('div');
+          card.className = 'gallery-card';
+          const thumbUrl = item.thumbnail_url || '/api/video_feed/primary';
+          const title = `${item.classification || 'Drone'} Incursion [${item.case_id || 'ID'}]`;
+          const timeFormatted = new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          card.innerHTML = `
+            <img class="gallery-card__img" src="${thumbUrl}" alt="${title}" />
+            <div class="gallery-card__footer">
+              <span style="font-weight:600; color:var(--color-light);">${title}</span>
+              <span style="color:var(--color-accent); font-family:var(--font-mono); font-size:0.7rem;">${timeFormatted}</span>
+            </div>
+          `;
+          card.addEventListener('click', () => openLightbox(thumbUrl, `${title} — Bearing ${item.bearing_deg || 0}°`));
+          container.appendChild(card);
+        });
+      } catch (err) {
+        console.error('Failed to load snapshots gallery:', err);
+      }
     }
 
     function openVideoLightbox(videoUrl, caption) {
@@ -3326,6 +3364,38 @@
           updateTelemetryDisplay(payload);
           updateCompassVisual(azVal, getCardinalDirection(azVal));
 
+          // Immediately zero out KPI counters and detection stats
+          const kpiTotal = document.getElementById('kpi-total');
+          if (kpiTotal) kpiTotal.textContent = '0';
+          const kpiToday = document.getElementById('kpi-today');
+          if (kpiToday) kpiToday.textContent = '0';
+          const repTotal = document.getElementById('rep-kpi-total');
+          if (repTotal) repTotal.textContent = '0';
+          const repHigh = document.getElementById('rep-kpi-high');
+          if (repHigh) repHigh.textContent = '0';
+
+          // Clear event logs UI
+          const eventList = document.getElementById('event-logs-list');
+          if (eventList) eventList.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:12px;">No detections recorded. System clear.</div>';
+
+          // Clear radar and live targets
+          if (typeof clearLiveTelemetryAndRadar === 'function') {
+            clearLiveTelemetryAndRadar(true);
+          }
+
+          // Reload evidence vault and snapshots (now empty)
+          if (typeof loadEvidenceVault === 'function') {
+            loadEvidenceVault();
+          }
+
+          // Re-render charts so they start from zero
+          if (typeof initPlotlyCharts === 'function') {
+            initPlotlyCharts();
+          }
+          if (typeof generateReport === 'function') {
+            generateReport();
+          }
+
           const cardName = getCardinalDirection(azVal);
           showToast(`✅ Saved! Camera set to facing ${cardName} (${azVal.toFixed(1)}°). Live feed refreshed.`);
 
@@ -3345,6 +3415,19 @@
         }
       } catch (err) {
         showToast(`Save failed: ${err.message}`);
+      }
+    }
+
+    async function loadOverviewKPIs() {
+      try {
+        const res = await fetch('/api/analytics/overview');
+        const data = await res.json();
+        const kpiTotal = document.getElementById('kpi-total');
+        if (kpiTotal) kpiTotal.textContent = (data.total_detections || 0).toLocaleString();
+        const kpiToday = document.getElementById('kpi-today');
+        if (kpiToday) kpiToday.textContent = (data.today_detections || 0).toLocaleString();
+      } catch (e) {
+        console.error('Failed to load overview KPIs:', e);
       }
     }
 
@@ -3372,11 +3455,13 @@
 
     // Initial load on startup
     window.addEventListener('DOMContentLoaded', () => {
+      loadOverviewKPIs();
       generateReport();
       loadCameraConfig();
       loadRFComsetStatus();
       loadSirenStatus();
       loadEvidenceVault();
+      initPlotlyCharts();
     });
   </script>
 </body>
