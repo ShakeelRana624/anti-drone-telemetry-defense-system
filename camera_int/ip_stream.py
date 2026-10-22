@@ -246,12 +246,8 @@ class IPCameraStream:
                             is_reachable, _, _ = probe_ip_camera(cam_ip, cam_port, timeout_sec=0.8)
 
                         if is_reachable:
-                            if is_file and hasattr(cv2, "CAP_MSMF"):
-                                cap = cv2.VideoCapture(self.source, cv2.CAP_MSMF)
-                                if not cap.isOpened():
-                                    cap = cv2.VideoCapture(self.source)
-                            else:
-                                cap = cv2.VideoCapture(self.source)
+                            t0 = time.perf_counter()
+                            cap = cv2.VideoCapture(self.source)
                             if cap.isOpened():
                                 cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
                                 self._cap = cap

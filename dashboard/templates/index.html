@@ -1300,35 +1300,49 @@
               updateTelemetryTable(data);
               updateAirspaceRadar(data);
 
-              appendEventLog(data);
-              const spdVal = parseFloat(data.speed_kmh !== undefined ? data.speed_kmh : 0.0).toFixed(1);
-              const mStateVal = data.motion_state || 'HOVERING';
-              const etaToastPart = (mStateVal === 'INBOUND' && (data.eta_str || data.eta_seconds)) ? ` | ⏱️ ETA: ${data.eta_str || (data.eta_seconds + 's')}` : '';
-              showToast(`🚨 Hostile target detected on ${data.camera_id || 'CAM 01'}! [BRG: ${(data.bearing_deg || 100.1).toFixed(1)}° | DST: ${(data.distance_m || 85).toFixed(0)}m | SPD: ${spdVal} km/h | ${mStateVal}${etaToastPart}]`);
-              startSirenCountdown(30);
-              playBrowserSirenSound(30);
-
-              const banner = document.getElementById('incursion-banner');
-              const bText = document.getElementById('banner-text');
-              if (banner && bText) {
-                const brgVal = (data.bearing_deg || 100.1).toFixed(1);
-                const dstVal = (data.distance_m || 85).toFixed(0);
-                const gndVal = (data.ground_distance_m || 84).toFixed(0);
-                const latVal = (data.drone_lat || 33.685123).toFixed(5);
-                const lonVal = (data.drone_lon || 73.048934).toFixed(5);
-                const etaBanner = (mStateVal === 'INBOUND' && (data.eta_str || data.eta_seconds)) ? ` | ⚡ BASE ETA: ${data.eta_str || (data.eta_seconds + 's')}` : '';
-                bText.textContent = `TACTICAL ALERT: AERIAL DRONE DETECTED [BRG: ${brgVal}° | DST: ${dstVal}m | GND: ${gndVal}m | SPD: ${spdVal} km/h (${mStateVal})${etaBanner} | GPS: ${latVal}, ${lonVal}] — 30s SIREN SOUNDING`;
-                banner.classList.add('active');
+              // Live update of Camera HUD overlay
+              const camHud = document.querySelector('#hud-cam1 .hud-telemetry');
+              if (camHud) {
+                const azVal = (data.azimuth_deg >= 0 ? '+' : '') + parseFloat(data.azimuth_deg || 0).toFixed(1);
+                const elVal = (data.elevation_deg >= 0 ? '+' : '') + parseFloat(data.elevation_deg || 0).toFixed(1);
+                const rngVal = parseFloat(data.distance_m || 0).toFixed(0);
+                const brgVal = parseFloat(data.bearing_deg || 0).toFixed(1);
+                const card = getCardinalDirection(data.bearing_deg || 0);
+                const spdVal = parseFloat(data.speed_kmh || 0).toFixed(1);
+                camHud.textContent = `AZIMUTH: ${azVal}° | ELEV: ${elVal}° | RNG: ${rngVal}m | TRUE COMPASS: ${brgVal}° (${card}) | SPD: ${spdVal} km/h`;
               }
 
-              // Flash all 5 RF units cards
-              document.querySelectorAll('.rf-unit-card').forEach(c => c.classList.add('active-alert'));
-              setTimeout(() => {
-                document.querySelectorAll('.rf-unit-card').forEach(c => c.classList.remove('active-alert'));
-              }, 4000);
+              if (data.event === 'detection' || data.trigger_alert) {
+                appendEventLog(data);
+                const spdVal = parseFloat(data.speed_kmh !== undefined ? data.speed_kmh : 0.0).toFixed(1);
+                const mStateVal = data.motion_state || 'HOVERING';
+                const etaToastPart = (mStateVal === 'INBOUND' && (data.eta_str || data.eta_seconds)) ? ` | ⏱️ ETA: ${data.eta_str || (data.eta_seconds + 's')}` : '';
+                showToast(`🚨 Hostile target detected on ${data.camera_id || 'CAM 01'}! [BRG: ${(data.bearing_deg || 100.1).toFixed(1)}° | DST: ${(data.distance_m || 85).toFixed(0)}m | SPD: ${spdVal} km/h | ${mStateVal}${etaToastPart}]`);
+                startSirenCountdown(30);
+                playBrowserSirenSound(30);
 
-              // Prepend newly captured evidence video
-              setTimeout(loadEvidenceVideos, 1500);
+                const banner = document.getElementById('incursion-banner');
+                const bText = document.getElementById('banner-text');
+                if (banner && bText) {
+                  const brgVal = (data.bearing_deg || 100.1).toFixed(1);
+                  const dstVal = (data.distance_m || 85).toFixed(0);
+                  const gndVal = (data.ground_distance_m || 84).toFixed(0);
+                  const latVal = (data.drone_lat || 33.685123).toFixed(5);
+                  const lonVal = (data.drone_lon || 73.048934).toFixed(5);
+                  const etaBanner = (mStateVal === 'INBOUND' && (data.eta_str || data.eta_seconds)) ? ` | ⚡ BASE ETA: ${data.eta_str || (data.eta_seconds + 's')}` : '';
+                  bText.textContent = `TACTICAL ALERT: AERIAL DRONE DETECTED [BRG: ${brgVal}° | DST: ${dstVal}m | GND: ${gndVal}m | SPD: ${spdVal} km/h (${mStateVal})${etaBanner} | GPS: ${latVal}, ${lonVal}] — 30s SIREN SOUNDING`;
+                  banner.classList.add('active');
+                }
+
+                // Flash all 5 RF units cards
+                document.querySelectorAll('.rf-unit-card').forEach(c => c.classList.add('active-alert'));
+                setTimeout(() => {
+                  document.querySelectorAll('.rf-unit-card').forEach(c => c.classList.remove('active-alert'));
+                }, 4000);
+
+                // Prepend newly captured evidence video
+                setTimeout(loadEvidenceVideos, 1500);
+              }
             } else if (data.event === 'telemetry_clear') {
               clearLiveTelemetryAndRadar(true);
             }
@@ -1462,7 +1476,7 @@
         <td>${motionBadge}</td>
         <td>${etaBadge}</td>
         <td><span class="gps-badge" onclick="copyGPS('${lat.toFixed(6)}, ${lon.toFixed(6)}')">📍 ${lat.toFixed(6)}, ${lon.toFixed(6)}</span></td>
-        <td><span class="lock-pill">LOCKED [8/8]</span></td>
+        <td><span class="lock-pill">${t.status || 'LOCKED'}</span></td>
         <td style="color:var(--color-muted);">${timeStr}</td>
       `;
 
@@ -1473,50 +1487,6 @@
         countTxt.textContent = `${activeCount} TARGET${activeCount > 1 ? 'S' : ''} LOCKED`;
       }
     }
-
-    // Auto-purge stale targets older than 8s
-    setInterval(() => {
-      const now = Date.now();
-      let changed = false;
-      for (const [tid, tgt] of Object.entries(trackedTargets)) {
-        if (now - tgt.updated > 8000) {
-          delete trackedTargets[tid];
-          changed = true;
-          const row = document.getElementById(`tgt-row-${tid.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
-          if (row) row.remove();
-          const blip = document.getElementById(`radar-blip-${tid.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
-          if (blip) blip.remove();
-        }
-      }
-      if (changed) {
-        const activeCount = Object.keys(trackedTargets).length;
-        const badge = document.getElementById('telemetry-target-count-badge');
-        const countTxt = document.getElementById('telemetry-count-text');
-        const tbody = document.getElementById('telemetry-table-body');
-        if (activeCount === 0) {
-          if (badge && countTxt) {
-            badge.classList.remove('has-targets');
-            countTxt.textContent = '0 TARGETS LOCKED';
-          }
-          if (tbody && !document.getElementById('telemetry-empty-row')) {
-            tbody.innerHTML = `
-              <tr id="telemetry-empty-row">
-                <td colspan="11" class="telemetry-empty-row">
-                  📡 Airspace clear. Camera optical sensor and tactical radar scanning for targets...
-                </td>
-              </tr>
-            `;
-          }
-          const footerTxt = document.getElementById('radar-summary-target');
-          if (footerTxt) footerTxt.textContent = 'AIRSPACE CLEAR';
-        } else {
-          if (badge && countTxt) {
-            badge.classList.add('has-targets');
-            countTxt.textContent = `${activeCount} TARGET${activeCount > 1 ? 'S' : ''} LOCKED`;
-          }
-        }
-      }
-    }, 2000);
 
     function updateAirspaceRadar(t) {
       const container = document.getElementById('radar-blips-container');
@@ -1641,8 +1611,8 @@
       if (tbody) {
         tbody.innerHTML = `
           <tr id="telemetry-empty-row">
-            <td colspan="11" class="telemetry-empty-row">
-              📡 Airspace clear. Dual camera optical/thermal sensors scanning for targets...
+            <td colspan="12" class="telemetry-empty-row">
+              📡 Airspace clear. Camera 01 optical sensor actively scanning...
             </td>
           </tr>
         `;
@@ -1663,6 +1633,53 @@
         showToast('All targets cleared from Radar & Telemetry stream.');
       }
     }
+
+    // Auto-cleanup stale tracks if no updates received for > 5 seconds
+    setInterval(() => {
+      const now = Date.now();
+      let changed = false;
+      for (const [tid, tgt] of Object.entries(trackedTargets)) {
+        if (tgt.updated && (now - tgt.updated) > 5000) {
+          const rowId = `tgt-row-${tid.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+          const r = document.getElementById(rowId);
+          if (r) r.remove();
+
+          const blipId = `radar-blip-${tid.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+          const b = document.getElementById(blipId);
+          if (b) b.remove();
+
+          delete trackedTargets[tid];
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        const count = Object.keys(trackedTargets).length;
+        const badge = document.getElementById('telemetry-target-count-badge');
+        const countTxt = document.getElementById('telemetry-count-text');
+        if (badge && countTxt) {
+          if (count === 0) {
+            badge.classList.remove('has-targets');
+            countTxt.textContent = '0 TARGETS LOCKED';
+            const tbody = document.getElementById('telemetry-table-body');
+            if (tbody && !document.getElementById('telemetry-empty-row')) {
+              tbody.innerHTML = `
+                <tr id="telemetry-empty-row">
+                  <td colspan="12" class="telemetry-empty-row">
+                    📡 Airspace clear. Camera 01 optical sensor actively scanning...
+                  </td>
+                </tr>
+              `;
+            }
+            const footerTxt = document.getElementById('radar-summary-target');
+            if (footerTxt) footerTxt.textContent = 'AIRSPACE CLEAR';
+          } else {
+            badge.classList.add('has-targets');
+            countTxt.textContent = `${count} TARGET${count > 1 ? 'S' : ''} LOCKED`;
+          }
+        }
+      }
+    }, 2000);
 
     function copyGPS(coords) {
       if (navigator.clipboard) {
@@ -1747,7 +1764,6 @@
       } catch {}
     }
     setTimeout(loadActiveTelemetryOnStartup, 800);
-    setInterval(loadActiveTelemetryOnStartup, 1000);
 
     // ═════════════════════════════════════════════════════════════
     // PLOTLY CHARTS IMPLEMENTATION (With User Brand Color Scheme)

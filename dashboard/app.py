@@ -25,8 +25,12 @@ from pathlib import Path
 from typing import Any, Deque, Dict, List
 
 from flask import Flask, Response, jsonify, render_template, request, send_file, stream_with_context
+import sys
 
 logger = logging.getLogger(__name__)
+
+# Ensure dashboard.app points to this module even when run as python dashboard/app.py (__main__)
+sys.modules["dashboard.app"] = sys.modules[__name__]
 
 # ══════════════════════════════════════════════════════════════════
 # Module-level SSE broadcast state (shared across all requests)
@@ -96,11 +100,6 @@ def push_sse_event(data: dict) -> None:
                 dead.append(q)
         for q in dead:
             _subscribers.remove(q)
-
-
-if __name__ == "__main__":
-    import sys
-    sys.modules["dashboard.app"] = sys.modules[__name__]
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -438,11 +437,9 @@ class DashboardApp:
                 import time
 
                 cam_mgr = get_ip_camera_manager()
-                if not getattr(cam_mgr, "_running", False):
-                    cam_mgr.start()
                 from detection.live_inference import get_live_inference_engine
                 engine = get_live_inference_engine()
-                engine.telemetry_callback = push_sse_event
+                engine.set_telemetry_callback(push_sse_event)
 
                 while True:
                     frame = cam_mgr.get_frame(camera_id)
@@ -1211,8 +1208,6 @@ if __name__ == "__main__":
     dash = DashboardApp(app_cfg, dummy_logger)
     dash.camera_status = {"primary": True}
     dash.model_path = "YOLO11m + SAHI + DeepSORT [Online]"
-    from camera_int import get_ip_camera_manager
-    get_ip_camera_manager().start()
     port = app_cfg.get("dashboard", {}).get("port", 5000)
     print(f"Starting Drone Detection Dashboard at http://127.0.0.1:{port} ...")
     dash.app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
