@@ -614,11 +614,11 @@ class DashboardApp:
                     else:
                         processed_frame = frame
 
-                    success, buffer = cv2.imencode(".jpg", processed_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                    success, buffer = cv2.imencode(".jpg", processed_frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
                     if success:
                         yield (b"--frame\r\n"
                                b"Content-Type: image/jpeg\r\n\r\n" + buffer.tobytes() + b"\r\n")
-                    time.sleep(0.04)  # ~25 fps smooth stream
+                    time.sleep(0.033)  # ~30 fps smooth high-speed video stream
 
             return Response(
                 stream_with_context(gen_frames()),

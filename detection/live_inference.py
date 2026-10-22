@@ -124,12 +124,31 @@ class LiveDroneInferenceEngine:
         self._last_push_time: Dict[str, float] = {}
         self._locked_announced: Dict[str, bool] = {}
 
-        # Event-triggered Forensic Evidence Video Recording (ONLY on drone detection, strictly 1 clip)
+        # Event-triggered Forensic Evidence Video Recording (strictly 1 clip per session)
         from collections import deque
         from logging_system.evidence_recorder import get_evidence_recorder
         self.evidence_recorder = get_evidence_recorder()
         self._frame_buffer = deque(maxlen=75)
         self._last_evidence_time = 0.0
+
+        # Asynchronous High-FPS Inference Pipeline
+        self._async_running = True
+        self._latest_raw_frame: Optional[np.ndarray] = None
+        self._latest_camera_id: str = "primary"
+        self._frame_event = threading.Event()
+        self._render_targets_lock = threading.Lock()
+        self._cached_render_targets: List[Dict[str, Any]] = []
+        self._last_infer_ms = 0.0
+        self._stream_fps = 25.0
+        self._stream_frame_count = 0
+        self._last_stream_time = time.time()
+
+        self._worker_thread = threading.Thread(
+            target=self._async_inference_loop,
+            daemon=True,
+            name="AI-AsyncInferenceWorker"
+        )
+        self._worker_thread.start()
 
     def reset_session(self) -> None:
         """Reset live tracking states and re-arm evidence recorder on camera configuration."""
@@ -138,10 +157,17 @@ class LiveDroneInferenceEngine:
             self._last_push_time.clear()
             self.last_active_targets.clear()
             self._frame_buffer.clear()
+            self._latest_raw_frame = None
             self._last_evidence_time = 0.0
-            from logging_system.evidence_recorder import EvidenceRecorder
-            EvidenceRecorder.reset_session()
-            logger.info("LiveInferenceEngine session reset.")
+        with self._render_targets_lock:
+            self._cached_render_targets.clear()
+        try:
+            self.tracker.reset()
+        except Exception:
+            pass
+        from logging_system.evidence_recorder import EvidenceRecorder
+        EvidenceRecorder.reset_session()
+        logger.info("LiveInferenceEngine session reset.")
 
     def set_telemetry_callback(self, callback) -> None:
         """Register a callback function to receive real-time target telemetry payloads."""
@@ -183,37 +209,33 @@ class LiveDroneInferenceEngine:
                 except (ValueError, TypeError):
                     pass
 
-    def process_frame(self, frame: np.ndarray, camera_id: str = "primary") -> np.ndarray:
+    def _async_inference_loop(self) -> None:
         """
-        Run inference on frame, update tracker and distance/GPS, render tactical HUD annotations,
-        and broadcast real-time telemetry events via SSE.
+        Continuous background worker running YOLO object detection and DeepSORT tracking
+        independently of the video streaming thread to guarantee high-FPS video output.
         """
-        if frame is None:
-            return frame
+        while self._async_running:
+            self._frame_event.wait(timeout=0.2)
+            self._frame_event.clear()
+            if not self._async_running:
+                break
 
-        with self._lock:
-            self.frame_idx += 1
-            self._frame_buffer.append(frame.copy())
-            now = time.time()
-            t0 = time.perf_counter()
+            with self._lock:
+                if self._latest_raw_frame is None:
+                    continue
+                frame = self._latest_raw_frame
+                camera_id = self._latest_camera_id
 
             h, w = frame.shape[:2]
-            out_frame = frame.copy()
+            t_start = time.perf_counter()
 
-            # Center boresight reference marker
-            cx = w // 2
-            cy = h // 2
-            cam_card = BearingCalculator.degrees_to_cardinal(self.camera_heading)
-            cv2.drawMarker(out_frame, (cx, cy), (100, 100, 130), cv2.MARKER_CROSS, 16, 1)
-            cv2.circle(out_frame, (cx, cy), 6, (100, 100, 130), 1)
-
-            # 1. Run YOLO inference on frame
+            # 1. Run YOLO inference (imgsz=512 for optimal CPU speed / accuracy balance)
             try:
                 results = self.yolo_model.predict(
                     frame,
                     conf=self.conf_thresh,
                     verbose=False,
-                    imgsz=640,
+                    imgsz=512,
                 )
             except Exception as err:
                 logger.error("YOLO live inference error: %s", err)
@@ -230,7 +252,6 @@ class LiveDroneInferenceEngine:
                         cls_id = int(box.cls[0])
                         cls_name = self.yolo_model.names.get(cls_id, "drone")
 
-                        # Normalize bbox to 0..1
                         norm_box = [
                             float(xyxy[0] / w),
                             float(xyxy[1] / h),
@@ -260,67 +281,36 @@ class LiveDroneInferenceEngine:
             )
             target_states = decision.target_states if decision else {}
 
-            # 4. Render Tactical Annotations ONLY IF TARGETS ARE FOUND
-            for det in active_targets:
-                x1, y1, x2, y2 = det.bbox
-                px1 = int(x1 * w); py1 = int(y1 * h)
-                px2 = int(x2 * w); py2 = int(y2 * h)
+            cam_card = BearingCalculator.degrees_to_cardinal(self.camera_heading)
+            rendered_list = []
+            now_epoch = time.time()
 
+            for det in active_targets:
                 tid = getattr(det, "track_id", None)
                 m = target_states.get(tid) if tid is not None else None
 
-                # Calculate Bearing & Distance/GPS
                 ang = self.bearing_calculator.calculate_for_detection(det)
                 true_brg = ang["true_bearing_deg"] if ang else self.camera_heading
                 cardinal = ang["cardinal_direction"] if ang else cam_card
                 rel_az = ang["rel_azimuth_deg"] if ang else 0.0
                 el_val = ang["elevation_deg"] if ang else 0.0
-                los_ang = ang["total_angle_deg"] if ang else 0.0
 
                 frame_time = self.frame_idx / 25.0
                 gps_data = self.dist_estimator.estimate_from_detection(
                     det, ang, track_id=str(tid) if tid is not None else "TGT-01", timestamp=frame_time
                 )
 
-                # State color code
                 if m and m.state in (TargetThreatState.CONFIRMED, TargetThreatState.COOLDOWN):
-                    box_color = CLR_ALERT       # Red for confirmed lock
+                    box_color = CLR_ALERT
                     state_text = "TARGET LOCKED"
                 elif m and m.state == TargetThreatState.SUSPICIOUS:
-                    box_color = CLR_YELLOW      # Yellow for verifying
+                    box_color = CLR_YELLOW
                     state_text = f"CONFIRMING LOCK ({m.consecutive_hits} frames)"
                 else:
-                    box_color = CLR_CYAN        # Cyan for acquiring
+                    box_color = CLR_CYAN
                     hits = m.consecutive_hits if m else 1
                     state_text = f"ACQUIRING ({hits} frames)"
 
-                # Bounding box
-                cv2.rectangle(out_frame, (px1, py1), (px2, py2), box_color, 2)
-
-                # Corner brackets
-                k = min(16, max(6, (px2 - px1) // 3), max(6, (py2 - py1) // 3))
-                cv2.line(out_frame, (px1, py1), (px1 + k, py1), CLR_ACCENT, 3)
-                cv2.line(out_frame, (px1, py1), (px1, py1 + k), CLR_ACCENT, 3)
-                cv2.line(out_frame, (px2, py1), (px2 - k, py1), CLR_ACCENT, 3)
-                cv2.line(out_frame, (px2, py1), (px2, py1 + k), CLR_ACCENT, 3)
-                cv2.line(out_frame, (px1, py2), (px1 + k, py2), CLR_ACCENT, 3)
-                cv2.line(out_frame, (px1, py2), (px1, py2 - k), CLR_ACCENT, 3)
-                cv2.line(out_frame, (px2, py2), (px2 - k, py2), CLR_ACCENT, 3)
-                cv2.line(out_frame, (px2, py2), (px2 - k, py2 - k), CLR_ACCENT, 3)
-
-                # Center marker
-                cen_x = (px1 + px2) // 2
-                cen_y = (py1 + py2) // 2
-                cv2.drawMarker(out_frame, (cen_x, cen_y), CLR_CRIMSON, cv2.MARKER_CROSS, 14, 2)
-
-                # Bearing ray line from boresight center to target center
-                cv2.line(out_frame, (cx, cy), (cen_x, cen_y), box_color, 1, cv2.LINE_AA)
-                mid_x = (cx + cen_x) // 2
-                mid_y = (cy + cen_y) // 2
-                cv2.circle(out_frame, (mid_x, mid_y), 3, box_color, -1)
-                cv2.putText(out_frame, f"BRG {true_brg:.1f}° {cardinal}", (mid_x + 6, mid_y - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.34, CLR_WHITE, 1, cv2.LINE_AA)
-
-                # Telemetry banner
                 id_str = f"#{tid}" if tid is not None else "LIVE"
                 tag_title = f"{det.class_name.upper()} | ID: {id_str} | {det.confidence*100:.1f}% | BRG: {true_brg:.1f}° ({cardinal})"
                 tag_sub   = f"{state_text} [Az: {rel_az:+.1f}° | El: {el_val:+.1f}°]"
@@ -342,7 +332,6 @@ class LiveDroneInferenceEngine:
                     time_to_base_str = "TIME TO BASE: N/A"
                     closing_kmh = 0.0
 
-                # Motion state color
                 if m_state == "INBOUND":
                     spd_color = CLR_ALERT
                 elif m_state == "OUTBOUND":
@@ -352,7 +341,6 @@ class LiveDroneInferenceEngine:
                 else:
                     spd_color = CLR_YELLOW
 
-                # ETA line
                 if m_state == "INBOUND" and eta_val is not None:
                     if eta_val <= 10.0:
                         eta_line  = f"BASE ETA: {eta_val:.1f}s [CRITICAL CLOSE]"
@@ -367,17 +355,22 @@ class LiveDroneInferenceEngine:
                     eta_line  = time_to_base_str
                     eta_color = CLR_WHITE
 
-                tag_w = max(330, max(len(tag_title), len(tag_sub), len(dist_line), len(speed_line), len(eta_line), len(gps_line)) * 7 + 10)
-                banner_top = max(38, py1 - 82)
-                cv2.rectangle(out_frame, (px1, banner_top), (min(w - 5, px1 + tag_w), max(82, py1)), CLR_HUD_BG, -1)
-                cv2.putText(out_frame, tag_title,  (px1 + 4, banner_top + 14), cv2.FONT_HERSHEY_SIMPLEX, 0.38, CLR_ACCENT, 1, cv2.LINE_AA)
-                cv2.putText(out_frame, tag_sub,    (px1 + 4, banner_top + 27), cv2.FONT_HERSHEY_SIMPLEX, 0.35, box_color,  1, cv2.LINE_AA)
-                cv2.putText(out_frame, dist_line,  (px1 + 4, banner_top + 40), cv2.FONT_HERSHEY_SIMPLEX, 0.34, CLR_YELLOW, 1, cv2.LINE_AA)
-                cv2.putText(out_frame, speed_line, (px1 + 4, banner_top + 52), cv2.FONT_HERSHEY_SIMPLEX, 0.34, spd_color,   1, cv2.LINE_AA)
-                cv2.putText(out_frame, eta_line,   (px1 + 4, banner_top + 65), cv2.FONT_HERSHEY_SIMPLEX, 0.35, eta_color,   1, cv2.LINE_AA)
-                cv2.putText(out_frame, gps_line,   (px1 + 4, banner_top + 77), cv2.FONT_HERSHEY_SIMPLEX, 0.34, CLR_GREEN,  1, cv2.LINE_AA)
+                rendered_list.append({
+                    "bbox": det.bbox,
+                    "box_color": box_color,
+                    "tag_title": tag_title,
+                    "tag_sub": tag_sub,
+                    "dist_line": dist_line,
+                    "speed_line": speed_line,
+                    "eta_line": eta_line,
+                    "gps_line": gps_line,
+                    "spd_color": spd_color,
+                    "eta_color": eta_color,
+                    "true_brg": true_brg,
+                    "cardinal": cardinal,
+                    "expire_at": now_epoch + 1.2
+                })
 
-                # Push live telemetry to C2 Dashboard (Radar Scope & Telemetry Feed Table)
                 if gps_data:
                     tgt_id_str = f"TGT-#{tid}" if tid is not None else "TGT-#01"
                     now_t = time.time()
@@ -387,21 +380,21 @@ class LiveDroneInferenceEngine:
                     if first_lock:
                         self._locked_announced[tgt_id_str] = True
 
-                        # Trigger forensic evidence video clip ONLY on drone detection lock (strictly 1 clip per session)
                         from logging_system.evidence_recorder import EvidenceRecorder
                         if not EvidenceRecorder._session_recorded:
-                            buffered_snap = list(self._frame_buffer)
+                            with self._lock:
+                                buffered_snap = list(self._frame_buffer)
                             det_snap = list(active_targets)
                             brg_snap = float(true_brg)
                             c_id_snap = str(camera_id)
                             gps_snap = (self.cam_lat, self.cam_lon)
-                            out_frame_snap = out_frame.copy()
+                            frame_snap = frame.copy()
 
                             def _record_task():
                                 try:
                                     logger.warning("🎬 Drone target %s confirmed: Recording single forensic MP4 evidence clip...", tgt_id_str)
                                     self.evidence_recorder.record_evidence_clip(
-                                        base_frame=out_frame_snap,
+                                        base_frame=frame_snap,
                                         detections=det_snap,
                                         camera_id=c_id_snap,
                                         bearing_deg=brg_snap,
@@ -416,7 +409,6 @@ class LiveDroneInferenceEngine:
 
                             threading.Thread(target=_record_task, daemon=True, name=f"evid-{tgt_id_str}").start()
 
-                    # Throttle regular telemetry to ~7 Hz (every 0.14s) to keep SSE smooth and responsive
                     if first_lock or (now_t - last_push) >= 0.14:
                         self._last_push_time[tgt_id_str] = now_t
                         status_str = "LOCKED [8/8]" if is_locked else ("CONFIRMING" if (m and m.state == TargetThreatState.SUSPICIOUS) else "ACQUIRING")
@@ -449,25 +441,93 @@ class LiveDroneInferenceEngine:
                             "status": status_str,
                             "timestamp": datetime.now(timezone.utc).strftime("%H:%M:%S"),
                         }
-
                         if self._telemetry_callback is not None:
                             try:
                                 self._telemetry_callback(payload)
                             except Exception as cb_err:
                                 logger.debug("Telemetry callback error: %s", cb_err)
-                        else:
-                            try:
-                                from dashboard.app import push_sse_event
-                                push_sse_event(payload)
-                            except Exception as sse_err:
-                                logger.debug("Fallback push_sse_event error: %s", sse_err)
 
-            # Bottom optical watermark (always visible, subtle)
-            elapsed_ms = (time.perf_counter() - t0) * 1000
-            fps_text = f"AI INFERENCE: {elapsed_ms:.1f}ms ({1000/max(1, elapsed_ms):.1f} FPS) | TARGETS: {len(active_targets)}"
-            cv2.putText(out_frame, fps_text, (14, h - 14), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (160, 160, 190), 1, cv2.LINE_AA)
+            with self._render_targets_lock:
+                self._cached_render_targets = rendered_list
 
-            return out_frame
+            self._last_infer_ms = (time.perf_counter() - t_start) * 1000
+
+    def process_frame(self, frame: np.ndarray, camera_id: str = "primary") -> np.ndarray:
+        """
+        Ultra-fast (<2ms) frame renderer and asynchronous AI dispatch for smooth 25-30 FPS video streaming.
+        """
+        if frame is None:
+            return frame
+
+        h, w = frame.shape[:2]
+        self.frame_idx += 1
+
+        # Buffer raw frame and trigger async AI inference
+        with self._lock:
+            self._frame_buffer.append(frame)
+            self._latest_raw_frame = frame
+            self._latest_camera_id = camera_id
+            self._frame_event.set()
+
+        # Measure real streaming FPS
+        now = time.time()
+        self._stream_frame_count += 1
+        dt = now - self._last_stream_time
+        if dt >= 1.0:
+            self._stream_fps = self._stream_frame_count / dt
+            self._stream_frame_count = 0
+            self._last_stream_time = now
+
+        out_frame = frame.copy()
+        cx, cy = w // 2, h // 2
+        cv2.drawMarker(out_frame, (cx, cy), (100, 100, 130), cv2.MARKER_CROSS, 16, 1)
+        cv2.circle(out_frame, (cx, cy), 6, (100, 100, 130), 1)
+
+        now_epoch = time.time()
+        with self._render_targets_lock:
+            active_render = [t for t in self._cached_render_targets if t.get("expire_at", 0) > now_epoch]
+
+        for t in active_render:
+            x1, y1, x2, y2 = t["bbox"]
+            px1 = int(x1 * w); py1 = int(y1 * h)
+            px2 = int(x2 * w); py2 = int(y2 * h)
+            box_color = t["box_color"]
+
+            cv2.rectangle(out_frame, (px1, py1), (px2, py2), box_color, 2)
+            k = min(16, max(6, (px2 - px1) // 3), max(6, (py2 - py1) // 3))
+            cv2.line(out_frame, (px1, py1), (px1 + k, py1), CLR_ACCENT, 3)
+            cv2.line(out_frame, (px1, py1), (px1, py1 + k), CLR_ACCENT, 3)
+            cv2.line(out_frame, (px2, py1), (px2 - k, py1), CLR_ACCENT, 3)
+            cv2.line(out_frame, (px2, py1), (px2, py1 + k), CLR_ACCENT, 3)
+            cv2.line(out_frame, (px1, py2), (px1 + k, py2), CLR_ACCENT, 3)
+            cv2.line(out_frame, (px1, py2), (px1, py2 - k), CLR_ACCENT, 3)
+            cv2.line(out_frame, (px2, py2), (px2 - k, py2), CLR_ACCENT, 3)
+            cv2.line(out_frame, (px2, py2), (px2 - k, py2 - k), CLR_ACCENT, 3)
+
+            cen_x = (px1 + px2) // 2
+            cen_y = (py1 + py2) // 2
+            cv2.drawMarker(out_frame, (cen_x, cen_y), CLR_CRIMSON, cv2.MARKER_CROSS, 14, 2)
+            cv2.line(out_frame, (cx, cy), (cen_x, cen_y), box_color, 1, cv2.LINE_AA)
+            mid_x = (cx + cen_x) // 2
+            mid_y = (cy + cen_y) // 2
+            cv2.circle(out_frame, (mid_x, mid_y), 3, box_color, -1)
+            cv2.putText(out_frame, f"BRG {t['true_brg']:.1f}° {t['cardinal']}", (mid_x + 6, mid_y - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.34, CLR_WHITE, 1, cv2.LINE_AA)
+
+            tag_w = max(330, max(len(t['tag_title']), len(t['tag_sub']), len(t['dist_line']), len(t['speed_line']), len(t['eta_line']), len(t['gps_line'])) * 7 + 10)
+            banner_top = max(38, py1 - 82)
+            cv2.rectangle(out_frame, (px1, banner_top), (min(w - 5, px1 + tag_w), max(82, py1)), CLR_HUD_BG, -1)
+            cv2.putText(out_frame, t['tag_title'],  (px1 + 4, banner_top + 14), cv2.FONT_HERSHEY_SIMPLEX, 0.38, CLR_ACCENT, 1, cv2.LINE_AA)
+            cv2.putText(out_frame, t['tag_sub'],    (px1 + 4, banner_top + 27), cv2.FONT_HERSHEY_SIMPLEX, 0.35, box_color,      1, cv2.LINE_AA)
+            cv2.putText(out_frame, t['dist_line'],  (px1 + 4, banner_top + 40), cv2.FONT_HERSHEY_SIMPLEX, 0.34, CLR_YELLOW,     1, cv2.LINE_AA)
+            cv2.putText(out_frame, t['speed_line'], (px1 + 4, banner_top + 52), cv2.FONT_HERSHEY_SIMPLEX, 0.34, t['spd_color'], 1, cv2.LINE_AA)
+            cv2.putText(out_frame, t['eta_line'],   (px1 + 4, banner_top + 65), cv2.FONT_HERSHEY_SIMPLEX, 0.35, t['eta_color'], 1, cv2.LINE_AA)
+            cv2.putText(out_frame, t['gps_line'],   (px1 + 4, banner_top + 77), cv2.FONT_HERSHEY_SIMPLEX, 0.34, CLR_GREEN,      1, cv2.LINE_AA)
+
+        fps_val = self._stream_fps if self._stream_fps > 0 else 25.0
+        fps_text = f"STREAM: {fps_val:.1f} FPS (HIGH SPEED) | AI WORKER: {self._last_infer_ms:.0f}ms | TARGETS: {len(active_render)}"
+        cv2.putText(out_frame, fps_text, (14, h - 14), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (160, 160, 190), 1, cv2.LINE_AA)
+
+        return out_frame
 
 
 _live_engine: Optional[LiveDroneInferenceEngine] = None
