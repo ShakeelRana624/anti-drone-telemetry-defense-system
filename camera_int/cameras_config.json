@@ -4,7 +4,7 @@
     "name": "Camera 01 — Optical HD (USB)",
     "sensor_type": "optical",
     "connection_mode": "usb",
-    "ip": "1",
+    "ip": "0",
     "port": 554,
     "username": "admin",
     "password": "12345",

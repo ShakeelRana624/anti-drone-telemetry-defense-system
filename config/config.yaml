@@ -28,7 +28,7 @@ tracker:
   cross_camera_window_s: 2.0
 cameras:
   primary:
-    source: 1
+    source: 0
     fps: 25
     resolution:
     - 1280

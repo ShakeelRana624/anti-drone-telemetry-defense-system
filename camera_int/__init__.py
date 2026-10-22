@@ -12,6 +12,7 @@ and coordinate tracking:
 from camera_int.camera_config import CameraConfigManager
 from camera_int.ip_stream import IPCameraStream, probe_ip_camera
 from camera_int.ip_manager import IPCameraManager, get_ip_camera_manager
+from camera_int.ptz_controller import PTZController, get_ptz_controller
 
 __all__ = [
     "CameraConfigManager",
@@ -19,4 +20,6 @@ __all__ = [
     "probe_ip_camera",
     "IPCameraManager",
     "get_ip_camera_manager",
+    "PTZController",
+    "get_ptz_controller",
 ]

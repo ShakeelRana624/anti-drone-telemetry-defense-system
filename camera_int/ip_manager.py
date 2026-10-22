@@ -95,12 +95,21 @@ class IPCameraManager:
             fps = round(stream.current_fps, 1) if stream else 0.0
             latency = stream.latency_ms if stream else 0.0
 
+            ptz_data = None
+            try:
+                from camera_int.ptz_controller import get_ptz_controller
+                ptz_ctrl = get_ptz_controller(cid, cfg)
+                ptz_data = ptz_ctrl.get_status()
+            except Exception:
+                pass
+
             statuses[cid] = {
                 **cfg,
                 "is_online": healthy,
                 "current_fps": fps,
                 "latency_ms": latency,
                 "status_label": "CONNECTED" if healthy else "SIMULATION / STANDBY",
+                "ptz": ptz_data,
             }
         return statuses
 
@@ -124,6 +133,13 @@ class IPCameraManager:
             self._streams[camera_id] = new_stream
             if self._running:
                 new_stream.start()
+
+        # Update PTZ Controller if available
+        try:
+            from camera_int.ptz_controller import get_ptz_controller
+            ptz = get_ptz_controller(camera_id, updated)
+        except Exception as e:
+            logger.debug("Could not update PTZ controller: %s", e)
 
         # Update Live Inference Engine if active
         try:

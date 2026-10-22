@@ -419,6 +419,45 @@ class DashboardApp:
             except Exception as exc:
                 return jsonify({"success": False, "message": str(exc), "latency_ms": 0.0}), 500
 
+        # ── PTZ Motorized Camera Controls & Telemetry ─────────────
+        @app.route("/api/camera/ptz/move", methods=["POST"])
+        def camera_ptz_move():
+            """
+            Execute motorized PTZ Pan/Tilt/Zoom or Home movement command and sync dynamic heading.
+
+            Returns:
+                Response: JSON containing updated Pan, Tilt, Zoom, and live true heading degree.
+            """
+            try:
+                from camera_int.ptz_controller import get_ptz_controller
+                data = request.get_json(force=True) or {}
+                cid = data.get("camera_id", "primary")
+                direction = data.get("direction", "stop")
+                speed = float(data.get("speed", 1.0))
+                step = float(data["step_deg"]) if "step_deg" in data else None
+
+                ptz = get_ptz_controller(cid)
+                status = ptz.move(direction=direction, speed=speed, step_deg=step)
+                return jsonify({"success": True, "ptz": status})
+            except Exception as exc:
+                return jsonify({"success": False, "error": str(exc)}), 500
+
+        @app.route("/api/camera/ptz/status", methods=["GET"])
+        def camera_ptz_status():
+            """
+            Query live PTZ motor positions, focal FOV, and absolute true compass heading.
+
+            Returns:
+                Response: JSON with live Pan, Tilt, Zoom, FOV, and live heading degree.
+            """
+            try:
+                from camera_int.ptz_controller import get_ptz_controller
+                cid = request.args.get("camera", "primary")
+                ptz = get_ptz_controller(cid)
+                return jsonify({"success": True, "ptz": ptz.get_status()})
+            except Exception as exc:
+                return jsonify({"success": False, "error": str(exc)}), 500
+
         # ── Video Streaming (MJPEG) linked to camera_int ─────────
         @app.route("/api/video_feed/<camera_id>")
         def video_feed(camera_id: str):

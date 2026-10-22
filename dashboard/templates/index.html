@@ -775,12 +775,13 @@
             <div class="control-field">
               <label for="cam-mode">Connection Protocol / Interface</label>
               <select class="control-select" id="cam-mode" onchange="onCameraModeChanged()">
-                <option value="usb" selected>🔌 USB Camera / Webcam (Direct Device Index)</option>
-                <option value="ip_rtsp">🌐 RTSP Stream (Standard CCTV / IP Security Camera)</option>
+                <option value="usb" selected>🔌 USB Camera / Webcam (Direct Device Index — Static)</option>
+                <option value="ptz_onvif">🔄 PTZ Motorized Camera (360° Pan-Tilt-Zoom with Dynamic Compass Sync)</option>
+                <option value="ip_rtsp">🌐 RTSP Stream (Standard Fixed CCTV / IP Security Camera)</option>
                 <option value="ip_http">📱 HTTP Stream (IP Webcam / Mobile App Stream)</option>
                 <option value="custom">📁 Custom Direct Stream URL or Video File</option>
               </select>
-              <div class="form-hint">Select USB for cameras plugged into computer ports.</div>
+              <div class="form-hint">Choose PTZ for motorized rotating cameras, or USB/RTSP for static cameras.</div>
             </div>
 
             <div class="control-field">
@@ -802,6 +803,119 @@
               </select>
               <div class="form-hint" style="margin-top:0.35rem; color:var(--color-muted);">
                 ⚡ Choose whether to use your plugged-in external USB camera (Index 1) or your laptop webcam (Index 0). The system will strictly use your choice and will never automatically change it.
+              </div>
+            </div>
+
+            <!-- PTZ Motorized Camera & Dynamic Heading Telemetry Group (Shown when PTZ is selected) -->
+            <div id="ptz-fields-group" class="form-group-full" style="display:none; width:100%; background:rgba(26,10,24,0.7); border:1px solid rgba(255,107,129,0.3); border-radius:var(--radius-sm); padding:1rem; margin-top:0.3rem;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.7rem;">
+                <label style="color:var(--color-accent); font-weight:700; font-size:0.9rem; display:flex; align-items:center; gap:0.4rem;">
+                  <span>🔄</span> PTZ Motorized Controls &amp; Dynamic Live Heading Tracking
+                </label>
+                <span class="meta-pill" style="color:#00f2fe; background:rgba(0,242,254,0.12); border:1px solid rgba(0,242,254,0.3); font-size:0.7rem;">
+                  DYNAMIC COMPASS SYNC ACTIVE
+                </span>
+              </div>
+              <p style="font-size:0.74rem; color:var(--color-muted); margin-bottom:0.85rem;">
+                When the PTZ camera rotates or zooms, the system calculates drone positions from:
+                <strong style="color:var(--color-light);">Live Heading = (Mount Base Heading + Pan Motor Angle) mod 360</strong>.
+                Drone compass bearings and radar sweep needles adjust dynamically in real time.
+              </p>
+
+              <!-- PTZ Network Parameters -->
+              <div class="form-grid-2col" style="margin-bottom:0.8rem;">
+                <div class="control-field">
+                  <label for="ptz-ip">PTZ Camera IP Address</label>
+                  <input class="control-input" type="text" id="ptz-ip" placeholder="192.168.1.101" />
+                </div>
+                <div class="control-field">
+                  <label for="ptz-protocol">Control Protocol</label>
+                  <select class="control-select" id="ptz-protocol">
+                    <option value="onvif" selected>ONVIF Profile S/T (Standard IP PTZ)</option>
+                    <option value="hikvision_isapi">Hikvision ISAPI / Turbo HD PTZ</option>
+                    <option value="dahua_cgi">Dahua CGI / Smart PTZ</option>
+                    <option value="pelco_d">Pelco-D / Serial Protocol</option>
+                  </select>
+                </div>
+                <div class="control-field">
+                  <label for="ptz-port">PTZ Control Port</label>
+                  <input class="control-input" type="number" id="ptz-port" value="80" placeholder="80 or 8000" />
+                </div>
+                <div class="control-field">
+                  <label for="ptz-speed">Motor Rotation Speed</label>
+                  <select class="control-select" id="ptz-speed">
+                    <option value="0.5">0.5x — Smooth Precision Slew (2.5°/step)</option>
+                    <option value="1.0" selected>1.0x — Standard Surveillance Slew (5.0°/step)</option>
+                    <option value="1.5">1.5x — High-Speed Tactical Tracking (7.5°/step)</option>
+                    <option value="2.0">2.0x — Rapid Interceptor Sweep (10.0°/step)</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Tactical PTZ Joystick / Directional Nudge Pad -->
+              <div class="ptz-controller-pad-box">
+                <div class="ptz-pad-title">
+                  <span>🎮</span> Manual PTZ Directional Aim &amp; Focal Zoom Pad
+                </div>
+                
+                <div class="ptz-controls-layout">
+                  <!-- D-Pad Directional Arrows -->
+                  <div class="ptz-dpad-grid">
+                    <div></div>
+                    <button type="button" class="btn-ptz-dir" onclick="ptzMove('up')" title="Tilt Up">
+                      <span>▲</span> TILT UP
+                    </button>
+                    <div></div>
+
+                    <button type="button" class="btn-ptz-dir" onclick="ptzMove('left')" title="Pan Left">
+                      <span>◀</span> PAN LEFT
+                    </button>
+                    <button type="button" class="btn-ptz-dir btn-ptz-home" onclick="ptzMove('home')" title="Home / Reset to Stand Reference">
+                      <span>⌂</span> HOME
+                    </button>
+                    <button type="button" class="btn-ptz-dir" onclick="ptzMove('right')" title="Pan Right">
+                      PAN RIGHT <span>▶</span>
+                    </button>
+
+                    <div></div>
+                    <button type="button" class="btn-ptz-dir" onclick="ptzMove('down')" title="Tilt Down">
+                      <span>▼</span> TILT DOWN
+                    </button>
+                    <div></div>
+                  </div>
+
+                  <!-- Zoom Buttons & Telemetry Readout -->
+                  <div class="ptz-telemetry-side">
+                    <div class="ptz-zoom-btn-row">
+                      <button type="button" class="btn-ptz-zoom" onclick="ptzMove('in')" title="Optical Zoom In">
+                        <span>🔍+</span> ZOOM IN
+                      </button>
+                      <button type="button" class="btn-ptz-zoom" onclick="ptzMove('out')" title="Optical Zoom Out">
+                        <span>🔍−</span> ZOOM OUT
+                      </button>
+                    </div>
+
+                    <!-- Live Motor Angles Readout -->
+                    <div class="ptz-telemetry-readout">
+                      <div class="ptz-readout-item">
+                        <span class="ptz-lbl">Motor Pan:</span>
+                        <strong class="ptz-val" id="ptz-pan-readout">0.0° (Center)</strong>
+                      </div>
+                      <div class="ptz-readout-item">
+                        <span class="ptz-lbl">Motor Tilt:</span>
+                        <strong class="ptz-val" id="ptz-tilt-readout">0.0°</strong>
+                      </div>
+                      <div class="ptz-readout-item">
+                        <span class="ptz-lbl">Optical Zoom:</span>
+                        <strong class="ptz-val" id="ptz-zoom-readout">1.0x (Wide)</strong>
+                      </div>
+                      <div class="ptz-readout-item ptz-readout-item--highlight">
+                        <span class="ptz-lbl">Live True Heading:</span>
+                        <strong class="ptz-val" id="ptz-heading-readout" style="color:#ff4757;">090.0° (East)</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -2863,18 +2977,71 @@
     function onCameraModeChanged() {
       const mode = document.getElementById('cam-mode').value;
       const usbGroup = document.getElementById('usb-fields-group');
+      const ptzGroup = document.getElementById('ptz-fields-group');
       const ipGroup = document.getElementById('ip-fields-group');
       const testBtn = document.getElementById('btn-test-camera');
 
       if (mode === 'usb') {
         if (usbGroup) usbGroup.style.display = 'block';
+        if (ptzGroup) ptzGroup.style.display = 'none';
         if (ipGroup) ipGroup.style.display = 'none';
         if (testBtn) testBtn.innerHTML = '<span>🔌</span> Test USB Camera Hardware';
+      } else if (mode === 'ptz_onvif') {
+        if (usbGroup) usbGroup.style.display = 'none';
+        if (ptzGroup) ptzGroup.style.display = 'block';
+        if (ipGroup) ipGroup.style.display = 'block';
+        if (testBtn) testBtn.innerHTML = '<span>🔄</span> Test PTZ &amp; Motor Link';
       } else {
         if (usbGroup) usbGroup.style.display = 'none';
+        if (ptzGroup) ptzGroup.style.display = 'none';
         if (ipGroup) ipGroup.style.display = 'block';
         if (testBtn) testBtn.innerHTML = '<span>🔍</span> Test IP Connection';
       }
+    }
+
+    async function ptzMove(direction) {
+      const speedVal = parseFloat(document.getElementById('ptz-speed')?.value || '1.0');
+
+      try {
+        const res = await fetch('/api/camera/ptz/move', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            camera_id: activeCameraId,
+            direction: direction,
+            speed: speedVal
+          })
+        });
+        const data = await res.json();
+        if (data.success && data.ptz) {
+          const p = data.ptz;
+          updatePTZUI(p);
+
+          // Dynamically synchronize live heading into compass visual and telemetry
+          updateCompassVisual(p.live_heading_deg, p.live_cardinal);
+          updateTelemetryDisplay({ azimuth_deg: p.live_heading_deg });
+
+          const actionLabel = direction.toUpperCase();
+          showToast(`🔄 PTZ ${actionLabel}: Pan ${p.pan_deg > 0 ? '+' : ''}${p.pan_deg}° | Live Heading: ${p.live_heading_deg}° (${p.live_cardinal})`);
+        } else {
+          showToast(`PTZ Error: ${data.error || 'Command failed'}`);
+        }
+      } catch (err) {
+        showToast(`PTZ Move failed: ${err.message}`);
+      }
+    }
+
+    function updatePTZUI(p) {
+      if (!p) return;
+      const panEl = document.getElementById('ptz-pan-readout');
+      const tiltEl = document.getElementById('ptz-tilt-readout');
+      const zoomEl = document.getElementById('ptz-zoom-readout');
+      const headingEl = document.getElementById('ptz-heading-readout');
+
+      if (panEl) panEl.textContent = `${p.pan_deg > 0 ? '+' : ''}${p.pan_deg.toFixed(1)}° (${p.pan_deg === 0 ? 'Center' : (p.pan_deg > 0 ? 'Right' : 'Left')})`;
+      if (tiltEl) tiltEl.textContent = `${p.tilt_deg > 0 ? '+' : ''}${p.tilt_deg.toFixed(1)}°`;
+      if (zoomEl) zoomEl.textContent = `${p.zoom_level.toFixed(1)}x (FOV: ${p.current_fov_deg || 65}°)`;
+      if (headingEl) headingEl.textContent = `${p.live_heading_deg.toFixed(1)}° (${p.live_cardinal || 'N'})`;
     }
 
     function onUsbIndexChanged(val) {
@@ -3004,6 +3171,19 @@
       const fovSelect = document.getElementById('cam-fov');
       if (fovSelect) fovSelect.value = String(Math.round(fov));
 
+      // PTZ parameter population
+      const ptzIpEl = document.getElementById('ptz-ip');
+      if (ptzIpEl) ptzIpEl.value = cam.ptz_ip || (cam.ip !== undefined ? cam.ip : '192.168.1.101');
+      const ptzProtoEl = document.getElementById('ptz-protocol');
+      if (ptzProtoEl) ptzProtoEl.value = cam.ptz_protocol || 'onvif';
+      const ptzPortEl = document.getElementById('ptz-port');
+      if (ptzPortEl) ptzPortEl.value = cam.ptz_port || 80;
+      const ptzSpeedEl = document.getElementById('ptz-speed');
+      if (ptzSpeedEl) ptzSpeedEl.value = String(cam.ptz_speed || '1.0');
+      if (cam.ptz) {
+        updatePTZUI(cam.ptz);
+      }
+
       onCameraModeChanged();
       setCardinalSide(az, getCardinalDirection(az));
 
@@ -3016,7 +3196,7 @@
         statusText.textContent = `Live Camera Stream Active (${cam.current_fps || 25} FPS)`;
       } else {
         statusBadge.innerHTML = `<span class="status-indicator-tag status-indicator-tag--sim"><span class="status-dot status-dot--warn"></span> STANDBY / READY</span>`;
-        statusText.textContent = mode === 'usb' ? `USB Device Ready &bull; Tactical Monitor Active` : `Awaiting IP Stream &bull; Tactical Monitor Active`;
+        statusText.textContent = mode === 'usb' ? `USB Device Ready &bull; Tactical Monitor Active` : (mode === 'ptz_onvif' ? `PTZ Device Ready &bull; Dynamic Compass Sync Active` : `Awaiting IP Stream &bull; Tactical Monitor Active`);
       }
 
       updateTelemetryDisplay(cam);
@@ -3043,7 +3223,7 @@
 
       const rtspEl = document.getElementById('geo-rtsp-val');
       if (rtspEl) {
-        rtspEl.textContent = mode === 'usb' ? `USB Device (Index ${ip || 0})` : `rtsp://${ip}:${port}${path}`;
+        rtspEl.textContent = mode === 'usb' ? `USB Device (Index ${ip || 0})` : (mode === 'ptz_onvif' ? `PTZ Motorized: ${ip}:${port}` : `rtsp://${ip}:${port}${path}`);
       }
 
       const sampleEl = document.getElementById('geo-calc-sample');
@@ -3052,8 +3232,9 @@
 
     async function testCameraProbe() {
       const mode = document.getElementById('cam-mode').value;
-      const ip = mode === 'usb' ? (document.getElementById('cam-usb-index').value || '0') : document.getElementById('cam-ip').value.trim();
-      const port = parseInt(document.getElementById('cam-port').value) || 554;
+      const ptzIp = document.getElementById('ptz-ip') ? document.getElementById('ptz-ip').value.trim() : '192.168.1.101';
+      const ip = mode === 'usb' ? (document.getElementById('cam-usb-index').value || '0') : (mode === 'ptz_onvif' ? ptzIp : document.getElementById('cam-ip').value.trim());
+      const port = mode === 'ptz_onvif' ? (parseInt(document.getElementById('ptz-port')?.value) || 80) : (parseInt(document.getElementById('cam-port').value) || 554);
       const alertBox = document.getElementById('probe-alert');
       const alertMsg = document.getElementById('probe-alert-msg');
       const alertIcon = document.getElementById('probe-alert-icon');
@@ -3063,7 +3244,9 @@
       alertBox.style.borderColor = '#ff9f1c';
       alertBox.style.color = '#ffd166';
       alertIcon.textContent = '⏳';
-      alertMsg.textContent = mode === 'usb' ? `Verifying USB Camera device at Index ${ip}...` : `Probing ${ip}:${port} on local network...`;
+      alertMsg.textContent = mode === 'usb' 
+        ? `Verifying USB Camera device at Index ${ip}...` 
+        : (mode === 'ptz_onvif' ? `Pinging PTZ ONVIF motor & video stream at ${ip}:${port}...` : `Probing ${ip}:${port} on local network...`);
 
       try {
         const res = await fetch('/api/camera/test', {
@@ -3095,8 +3278,9 @@
     async function saveCameraConfiguration() {
       const mode = document.getElementById('cam-mode').value;
       const usbIdx = document.getElementById('cam-usb-index') ? document.getElementById('cam-usb-index').value : '0';
-      const ipVal = mode === 'usb' ? usbIdx : (document.getElementById('cam-ip').value.trim() || '192.168.1.101');
-      const portVal = mode === 'usb' ? 554 : (parseInt(document.getElementById('cam-port').value) || 554);
+      const ptzIp = document.getElementById('ptz-ip') ? document.getElementById('ptz-ip').value.trim() : '192.168.1.101';
+      const ipVal = mode === 'usb' ? usbIdx : (mode === 'ptz_onvif' ? ptzIp : (document.getElementById('cam-ip').value.trim() || '192.168.1.101'));
+      const portVal = mode === 'usb' ? 554 : (mode === 'ptz_onvif' ? (parseInt(document.getElementById('ptz-port')?.value) || 80) : (parseInt(document.getElementById('cam-port').value) || 554));
       const pathVal = mode === 'usb' ? '' : document.getElementById('cam-path').value.trim();
 
       const azVal = ((parseFloat(document.getElementById('cam-azimuth').value) || 90.0) % 360 + 360) % 360;
@@ -3121,6 +3305,13 @@
         sensor_type: document.getElementById('cam-sensor-type').value || 'optical',
         enabled: true
       };
+
+      if (mode === 'ptz_onvif') {
+        payload.ptz_ip = ptzIp;
+        payload.ptz_protocol = document.getElementById('ptz-protocol') ? document.getElementById('ptz-protocol').value : 'onvif';
+        payload.ptz_port = parseInt(document.getElementById('ptz-port')?.value) || 80;
+        payload.ptz_speed = parseFloat(document.getElementById('ptz-speed')?.value) || 1.0;
+      }
 
       try {
         const res = await fetch('/api/camera/update', {
