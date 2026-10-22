@@ -242,8 +242,12 @@ class IPCameraStream:
         while self._running:
             now = time.time()
 
-            # Attempt capture if available
+            # Attempt capture if available and camera is configured
             if self._cap is None:
+                if not self.config.get("configured", False):
+                    time.sleep(interval)
+                    continue
+
                 if now - last_reconnect_attempt > reconnect_delay:
                     last_reconnect_attempt = now
                     try:
@@ -357,12 +361,17 @@ class IPCameraStream:
         cv2.line(img, (cx, cy - 20), (cx, cy - 8), accent_bgr, 1)
         cv2.line(img, (cx, cy + 8), (cx, cy + 20), accent_bgr, 1)
 
-        # Clean tactical surveillance standby status (NO FAKE TARGETS)
-        cv2.putText(img, "AIRSPACE SECURE - OPTICAL SURVEILLANCE ACTIVE", (cx - 190, cy + 70), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (180, 180, 210), 1, cv2.LINE_AA)
-        cv2.putText(img, "AWAITING AERIAL TARGET DETECTION", (cx - 130, cy + 95), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (120, 120, 150), 1, cv2.LINE_AA)
+        # Clean tactical surveillance standby status
+        if not self.config.get("configured", False):
+            cv2.putText(img, "SENSOR UNCONFIGURED // HARDWARE OFFLINE", (cx - 180, cy + 70), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (180, 180, 210), 1, cv2.LINE_AA)
+            cv2.putText(img, "OPEN CAMERA SETUP TAB TO CONFIGURE SENSOR", (cx - 190, cy + 95), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (120, 120, 150), 1, cv2.LINE_AA)
+            status_text = "STANDBY [CAMERA UNCONFIGURED]"
+        else:
+            cv2.putText(img, "AIRSPACE SECURE - OPTICAL SURVEILLANCE ACTIVE", (cx - 190, cy + 70), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (180, 180, 210), 1, cv2.LINE_AA)
+            cv2.putText(img, "AWAITING AERIAL TARGET DETECTION", (cx - 130, cy + 95), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (120, 120, 150), 1, cv2.LINE_AA)
+            status_text = "LIVE [IP CONNECTED]" if self.healthy else "STANDBY [SIMULATOR MODE]"
 
         # Top Bar: Camera Label & Status
-        status_text = "LIVE [IP CONNECTED]" if self.healthy else "STANDBY [SIMULATOR MODE]"
         cam_label = self.config.get("name", self.camera_id).replace("—", "-").replace("–", "-").upper()
         cv2.putText(img, f"{status_text}  {cam_label}", (14, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (241, 244, 247), 1, cv2.LINE_AA)
 

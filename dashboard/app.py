@@ -487,6 +487,7 @@ class DashboardApp:
                 from camera_int import get_ip_camera_manager
                 data = request.get_json(force=True) or {}
                 camera_id = data.get("id", "primary")
+                data["configured"] = True
                 updated = get_ip_camera_manager().update_camera(camera_id, data)
 
                 # Reset session analytics and detection counters to 0

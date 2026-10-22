@@ -171,7 +171,7 @@ class CameraConfigManager:
                     target[key] = int(value)
                 except (ValueError, TypeError):
                     pass
-            elif key == "enabled":
+            elif key in ["enabled", "configured"]:
                 target[key] = bool(value)
             else:
                 target[key] = value

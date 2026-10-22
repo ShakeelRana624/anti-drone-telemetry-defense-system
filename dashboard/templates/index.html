@@ -3151,6 +3151,16 @@
         if (data.success && data.cameras) {
           allCamerasData = data.cameras;
           populateCameraForm(activeCameraId);
+
+          const primaryCam = data.cameras.primary || {};
+          if (primaryCam.configured === false) {
+            // First time setup! Open Camera Setup tab automatically
+            const setupTabBtn = document.querySelector('button[data-tab="camera-setup"]');
+            if (setupTabBtn && !setupTabBtn.classList.contains('active')) {
+              setupTabBtn.click();
+            }
+            showToast('⚙️ First-Time Setup: Camera is unconfigured. Please select your camera source (USB / RTSP / PTZ), set compass azimuth, and click Save.');
+          }
         }
       } catch (err) {
         console.error('Failed to load camera config:', err);
@@ -3341,7 +3351,8 @@
         azimuth_deg: azVal,
         fov_deg: fovVal,
         sensor_type: document.getElementById('cam-sensor-type').value || 'optical',
-        enabled: true
+        enabled: true,
+        configured: true
       };
 
       if (mode === 'ptz_onvif') {

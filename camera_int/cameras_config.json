@@ -21,6 +21,7 @@
       720
     ],
     "enabled": true,
+    "configured": false,
     "notes": "Main optical zoom covering northern airspace perimeter."
   }
 }
