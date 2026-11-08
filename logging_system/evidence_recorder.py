@@ -40,6 +40,53 @@ CATALOG_PATH = EVIDENCE_DIR / "evidence_catalog.json"
 LEGACY_DIR = PROJECT_ROOT / "logs" / "evidence_videos"
 
 
+def ensure_h264_compatibility(video_path: Path) -> Path:
+    """
+    Ensure the given video file is encoded with H.264 (yuv420p) and +faststart.
+    If encoded in legacy mpeg4 (OpenCV default) or non-web codec, transcode
+    in-place to H.264 so HTML5 web browsers can stream and play it seamlessly.
+    """
+    if not video_path or not video_path.exists() or not video_path.is_file():
+        return video_path
+
+    try:
+        probe = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name", "-of", "csv=p=0", str(video_path)],
+            capture_output=True, text=True, timeout=5
+        )
+        codec = probe.stdout.strip().lower()
+        if codec == "h264":
+            return video_path
+    except Exception:
+        return video_path
+
+    temp_path = video_path.with_suffix(".transcoded.mp4")
+    try:
+        res = subprocess.run(
+            [
+                "ffmpeg", "-y", "-i", str(video_path),
+                "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                "-preset", "ultrafast", "-movflags", "+faststart",
+                str(temp_path)
+            ],
+            capture_output=True,
+            timeout=25
+        )
+        if res.returncode == 0 and temp_path.exists() and temp_path.stat().st_size > 0:
+            video_path.unlink(missing_ok=True)
+            temp_path.rename(video_path)
+            logger.info("🎬 [EVIDENCE] Transcoded %s to H.264 for HTML5 web playback", video_path.name)
+        else:
+            if temp_path.exists():
+                temp_path.unlink(missing_ok=True)
+    except Exception as e:
+        logger.warning("Could not transcode %s: %s", video_path.name, e)
+        if temp_path.exists():
+            temp_path.unlink(missing_ok=True)
+
+    return video_path
+
+
 class EvidenceRecorder:
     """Records, watermarks, and catalogs forensic MP4 evidence video clips."""
 
@@ -296,22 +343,28 @@ class EvidenceRecorder:
             except Exception:
                 pass
 
-        # Optional: FFmpeg faststart optimization
+        # FFmpeg transcode to H.264 + faststart for universal web browser HTML5 video playback
         try:
             temp_path = video_path.with_suffix(".tmp.mp4")
             res = subprocess.run(
-                ["ffmpeg", "-y", "-i", str(video_path), "-c:v", "copy", "-movflags", "+faststart", str(temp_path)],
+                [
+                    "ffmpeg", "-y", "-i", str(video_path),
+                    "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                    "-preset", "ultrafast", "-movflags", "+faststart",
+                    str(temp_path)
+                ],
                 capture_output=True,
-                timeout=12
+                timeout=25
             )
             if res.returncode == 0 and temp_path.exists() and temp_path.stat().st_size > 0:
                 video_path.unlink(missing_ok=True)
                 temp_path.rename(video_path)
+                logger.info("🎬 [EVIDENCE] Faststart H.264 transcode applied to %s", video_path.name)
             else:
                 if temp_path.exists():
                     temp_path.unlink(missing_ok=True)
         except Exception as ff_err:
-            logger.debug("Faststart remux bypassed: %s", ff_err)
+            logger.debug("Faststart H.264 remux bypassed: %s", ff_err)
 
         duration_sec = round(total_frames / fps, 1)
         size_kb = round(video_path.stat().st_size / 1024, 1) if video_path.exists() else 0.0
@@ -396,17 +449,23 @@ class EvidenceRecorder:
 
         writer.release()
 
-        # FFmpeg faststart
+        # FFmpeg transcode to H.264 + faststart
         try:
             temp_path = video_path.with_suffix(".tmp.mp4")
             res = subprocess.run(
-                ["ffmpeg", "-y", "-i", str(video_path), "-c:v", "copy", "-movflags", "+faststart", str(temp_path)],
+                [
+                    "ffmpeg", "-y", "-i", str(video_path),
+                    "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                    "-preset", "ultrafast", "-movflags", "+faststart",
+                    str(temp_path)
+                ],
                 capture_output=True,
-                timeout=10
+                timeout=20
             )
             if res.returncode == 0 and temp_path.exists() and temp_path.stat().st_size > 0:
                 video_path.unlink(missing_ok=True)
                 temp_path.rename(video_path)
+                logger.info("🎬 [EVIDENCE] H.264 transcode applied to %s", video_path.name)
             else:
                 if temp_path.exists():
                     temp_path.unlink(missing_ok=True)
@@ -442,20 +501,32 @@ class EvidenceRecorder:
     def list_evidence(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Return catalog of recorded evidence items from 'evidence/' and legacy paths."""
         catalog = self._load_catalog()
-        # Also scan directory for any loose MP4s not yet in catalog
         known_files = {item.get("filename") for item in catalog}
         new_items = []
-        for mp4 in sorted(self.output_dir.glob("*.mp4"), key=os.path.getmtime, reverse=True):
-            if mp4.name not in known_files and not mp4.name.endswith(".tmp.mp4"):
+
+        # 1. Discover all mp4 files in evidence/ and legacy logs/evidence_videos/
+        mp4_files = list(self.output_dir.rglob("*.mp4"))
+        if LEGACY_DIR.exists():
+            for lmp4 in LEGACY_DIR.rglob("*.mp4"):
+                if lmp4 not in mp4_files:
+                    mp4_files.append(lmp4)
+
+        for mp4 in sorted(mp4_files, key=lambda f: f.stat().st_mtime if f.exists() else 0, reverse=True):
+            if mp4.name not in known_files and not mp4.name.endswith(".tmp.mp4") and not mp4.name.endswith(".transcoded.mp4"):
                 mtime = datetime.fromtimestamp(mp4.stat().st_mtime)
                 thumb = mp4.with_name(f"{mp4.stem}_thumb.jpg")
+                if not thumb.exists():
+                    alt_thumb = mp4.with_suffix(".jpg")
+                    if alt_thumb.exists():
+                        thumb = alt_thumb
+
                 new_items.append({
                     "case_id": f"EVID-{mtime.strftime('%Y%m%d-%H%M%S')}",
                     "filename": mp4.name,
                     "camera_id": "primary",
                     "timestamp": mtime.strftime("%Y-%m-%d %H:%M:%S"),
-                    "duration_seconds": 10.0,
-                    "duration_sec": 10.0,
+                    "duration_seconds": 5.0,
+                    "duration_sec": 5.0,
                     "target_count": 1,
                     "bearing_deg": 45.0,
                     "city": "Sector Alpha",
@@ -468,6 +539,8 @@ class EvidenceRecorder:
                     "download_url": f"/api/evidence/download?filename={mp4.name}",
                     "size_kb": round(mp4.stat().st_size / 1024, 1),
                 })
+                known_files.add(mp4.name)
+
         if new_items:
             for itm in reversed(new_items):
                 catalog.insert(0, itm)
@@ -481,26 +554,35 @@ class EvidenceRecorder:
         """Locate video file within 'evidence/' or legacy directory safely, returning absolute Path."""
         if not filename:
             return None
+
+        # 0. Check direct path if provided
+        try:
+            direct_p = Path(filename)
+            if direct_p.is_file() and direct_p.exists():
+                return ensure_h264_compatibility(direct_p.resolve())
+        except Exception:
+            pass
+
         safe_name = os.path.basename(filename)
 
         # 1. Primary check: evidence/ directory
         p = self.output_dir / safe_name
         if p.exists() and p.is_file():
-            return p.resolve()
+            return ensure_h264_compatibility(p.resolve())
 
         # 2. Recursive check in evidence/
         for found in self.output_dir.rglob(safe_name):
             if found.is_file():
-                return found.resolve()
+                return ensure_h264_compatibility(found.resolve())
 
         # 3. Fallback check: legacy logs/evidence_videos/
         if LEGACY_DIR.exists():
             lp = LEGACY_DIR / safe_name
             if lp.exists() and lp.is_file():
-                return lp.resolve()
+                return ensure_h264_compatibility(lp.resolve())
             for found in LEGACY_DIR.rglob(safe_name):
                 if found.is_file():
-                    return found.resolve()
+                    return ensure_h264_compatibility(found.resolve())
 
         return None
 

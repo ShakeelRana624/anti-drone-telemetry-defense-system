@@ -35,6 +35,10 @@ test_videos/*
 !test_videos/.gitkeep
 logs/evidence_videos/*
 !logs/evidence_videos/.gitkeep
+evidence/*.mp4
+evidence/*.tmp*
+evidence/*.jpg
+!evidence/.gitkeep
 
 # Output videos (whitelist demo video and preview assets)
 output_videos/*

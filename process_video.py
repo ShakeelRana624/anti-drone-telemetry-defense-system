@@ -216,7 +216,7 @@ def process_video_file(
 
     event_logger = EventLogger(config)
     snapshot_saver = SnapshotSaver(config)
-    evidence_recorder = EvidenceRecorder(PROJECT_ROOT / "logs" / "evidence_videos")
+    evidence_recorder = EvidenceRecorder()
     tracker = DeepSORTTracker(config)
     bearing_calculator = BearingCalculator(config.get("bearing", {}))
 

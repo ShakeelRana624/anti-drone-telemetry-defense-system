@@ -798,7 +798,7 @@ class DashboardApp:
         @app.route("/api/evidence/video")
         def evidence_video():
             """
-            Stream a forensic evidence MP4 video clip to the web browser.
+            Stream a forensic evidence MP4 video clip to the web browser with HTTP 206 Partial Content support.
             Accepts either 'filename' or 'path' query parameter and validates bounds.
 
             Returns:
@@ -807,12 +807,23 @@ class DashboardApp:
             filename = request.args.get("filename") or request.args.get("path", "")
             if not filename:
                 return jsonify({"error": "Missing filename"}), 400
-            from logging_system.evidence_recorder import get_evidence_recorder
+            from logging_system.evidence_recorder import get_evidence_recorder, ensure_h264_compatibility
             recorder = get_evidence_recorder()
             p = recorder.get_video_path(filename)
             if not p or not p.exists():
                 return jsonify({"error": "Video file not found"}), 404
-            return send_file(str(p.resolve()), mimetype="video/mp4", as_attachment=False)
+
+            p = ensure_h264_compatibility(p)
+            resp = send_file(
+                str(p.resolve()),
+                mimetype="video/mp4",
+                as_attachment=False,
+                conditional=True,
+                etag=False,
+            )
+            resp.headers["Accept-Ranges"] = "bytes"
+            resp.headers["Cache-Control"] = "no-cache"
+            return resp
 
         @app.route("/api/evidence/download")
         def evidence_download():
@@ -826,11 +837,12 @@ class DashboardApp:
             filename = request.args.get("filename") or request.args.get("path", "")
             if not filename:
                 return jsonify({"error": "Missing filename"}), 400
-            from logging_system.evidence_recorder import get_evidence_recorder
+            from logging_system.evidence_recorder import get_evidence_recorder, ensure_h264_compatibility
             recorder = get_evidence_recorder()
             p = recorder.get_video_path(filename)
             if not p or not p.exists():
                 return jsonify({"error": "Video file not found"}), 404
+            p = ensure_h264_compatibility(p)
             return send_file(str(p.resolve()), as_attachment=True, download_name=p.name)
 
         # ── Tactical RF Comset API ───────────────────────────────

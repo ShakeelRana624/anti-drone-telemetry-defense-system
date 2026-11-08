@@ -2847,7 +2847,7 @@
           });
 
           card.innerHTML = `
-            <div class="evidence-card__thumb" onclick="openVideoLightbox('${videoUrl}', '${item.case_id} &bull; ${camLabel} &bull; Bearing ${item.bearing_deg}°')">
+            <div class="evidence-card__thumb" style="cursor:pointer;">
               <img class="evidence-card__img" src="${thumbUrl}" alt="Evidence Clip Thumbnail" />
               <div class="evidence-card__play-btn">▶</div>
               <div class="evidence-card__duration-badge">${item.duration_seconds || 5}s MP4</div>
@@ -2865,7 +2865,7 @@
                 <div style="grid-column:1/-1;">Recorded: <strong>${timeFormatted}</strong></div>
               </div>
               <div class="evidence-card__actions">
-                <button class="btn-evidence-play" onclick="openVideoLightbox('${videoUrl}', '${item.case_id} &bull; ${camLabel} &bull; Bearing ${item.bearing_deg}°')">
+                <button class="btn-evidence-play">
                   <span>▶</span> Play Evidence Clip
                 </button>
                 <a class="btn-evidence-dl" href="${dlUrl}" download title="Download Forensic MP4 Clip">
@@ -2874,6 +2874,13 @@
               </div>
             </div>
           `;
+
+          const clipCaption = `${item.case_id} • ${camLabel} • Bearing ${item.bearing_deg || 0}°`;
+          const playBtn = card.querySelector('.btn-evidence-play');
+          const thumbDiv = card.querySelector('.evidence-card__thumb');
+          if (playBtn) playBtn.addEventListener('click', () => openVideoLightbox(videoUrl, clipCaption));
+          if (thumbDiv) thumbDiv.addEventListener('click', () => openVideoLightbox(videoUrl, clipCaption));
+
           container.appendChild(card);
         });
       } catch (err) {
@@ -2930,10 +2937,35 @@
       if (modal && video) {
         if (img) img.style.display = 'none';
         video.style.display = 'block';
+        video.muted = true;
+        video.playsInline = true;
+
+        if (cap) {
+          cap.innerHTML = `🎬 Forensic Evidence Video: <strong>${caption || 'Target Drone Detection'}</strong> <span id="video-load-pill" style="font-size:0.72rem; color:var(--color-accent); margin-left:8px;">⏳ Loading Video...</span>`;
+        }
+
+        video.onloadeddata = () => {
+          const pill = document.getElementById('video-load-pill');
+          if (pill) {
+            pill.style.color = 'var(--status-ok)';
+            pill.innerText = `● Ready (${video.duration ? video.duration.toFixed(1) + 's' : 'HD'})`;
+          }
+        };
+
+        video.onerror = () => {
+          console.error("Evidence video playback error:", video.error);
+          const pill = document.getElementById('video-load-pill');
+          if (pill) {
+            pill.style.color = 'var(--color-crimson)';
+            pill.innerHTML = `⚠️ Playback error. <a href="${videoUrl}" download style="color:#fff; text-decoration:underline;">Download MP4</a>`;
+          }
+        };
+
         video.src = videoUrl;
         video.load();
-        video.play().catch(() => {});
-        if (cap) cap.innerHTML = `🎬 Forensic Evidence Video: <strong>${caption || 'Target Drone Detection'}</strong>`;
+        video.play().catch((err) => {
+          console.warn("Autoplay deferred by browser policy:", err);
+        });
         modal.classList.add('active');
       }
     }
@@ -2947,6 +2979,7 @@
       if (modal && img) {
         if (video) {
           video.pause();
+          video.removeAttribute('src');
           video.style.display = 'none';
         }
         img.style.display = 'block';
@@ -2962,7 +2995,8 @@
       if (modal) {
         if (video) {
           video.pause();
-          video.src = '';
+          video.removeAttribute('src');
+          video.load();
         }
         modal.classList.remove('active');
       }

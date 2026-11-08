@@ -6,9 +6,9 @@
 [![Model: YOLO11](https://img.shields.io/badge/Inference-YOLO11%20%7C%20ONNX-orange.svg)](https://github.com/ultralytics/ultralytics)
 [![Tracking: DeepSORT](https://img.shields.io/badge/Tracker-DeepSORT%20Cosine%20Metric-purple.svg)](https://github.com/nwojke/deep_sort)
 [![Inference: SAHI Sliced](https://img.shields.io/badge/SAHI-Sliced%20Hyper%20Inference-crimson.svg)](https://github.com/obss/sahi)
-[![PTZ: ONVIF & USB UVC](https://img.shields.io/badge/PTZ%20Control-ONVIF%20%7C%20USB--UVC-blueviolet.svg)](#-tactical-ptz-motorized-camera-control--dynamic-compass-sync)
-[![Alerts: Wireless Mobile & Urdu Voice](https://img.shields.io/badge/Alerts-Wireless%20Mobile%20%7C%20Urdu%20Voice-red.svg)](#-wireless-mobile-tactical-alerting--urdu-voice-c2)
-[![Network: 100% Offline Hotspot](https://img.shields.io/badge/Network-100%25%20Offline%20Hotspot-success.svg)](#-wireless-mobile-tactical-alerting--urdu-voice-c2)
+[![PTZ: ONVIF & USB UVC](https://img.shields.io/badge/PTZ%20Control-ONVIF%20%7C%20USB--UVC-blueviolet.svg)](#2--tactical-ptz-motorized-camera-control--dynamic-compass-sync)
+[![Alerts: Wireless Mobile & Urdu Voice](https://img.shields.io/badge/Alerts-Wireless%20Mobile%20%7C%20Urdu%20Voice-red.svg)](#3--wireless-mobile-tactical-alerting--urdu-voice-c2)
+[![Network: 100% Offline Hotspot](https://img.shields.io/badge/Network-100%25%20Offline%20Hotspot-success.svg)](#3--wireless-mobile-tactical-alerting--urdu-voice-c2)
 
 ---
 
@@ -16,7 +16,7 @@
 
 The **Anti-Drone Telemetry & Autonomous Defense System** is a production-grade, edge-deployable counter-UAS (Unmanned Aerial System) intelligence, spatial tracking, and early warning solution. Engineered for sovereign perimeter defense, border surveillance, and critical airspace infrastructure, the system autonomously detects low-RCS (Radar Cross Section) micro/mini drones, tracks them across camera boundaries, and dynamically computes full **3D spatial telemetry vectors**—including **True Compass Bearing**, **Optical Slant Distance**, **Altitude**, and **WGS-84 Geodetic GPS Coordinates**.
 
-The platform features an integrated **Motorized PTZ (Pan-Tilt-Zoom) Camera Subsystem with Dynamic Compass Angle Tracking**, a **100% Offline Mobile Tactical Early Warning System with Urdu Voice Warnings**, and an automated **Continuous Forensic Evidence Vault with Pre-Roll Buffering**.
+The platform features an integrated **Motorized PTZ (Pan-Tilt-Zoom) Camera Subsystem with Dynamic Compass Angle Tracking**, a **100% Offline Mobile Tactical Early Warning System with Urdu Voice Warnings**, and an automated **Continuous Forensic Evidence Vault with Pre-Roll Buffering & Universal H.264 Fast-Start Web Streaming**.
 
 ---
 
@@ -71,7 +71,7 @@ graph TD
         VEC --> DASH["Tactical Web C2 Dashboard<br/>(Live Radar Scope & Active Target Table)"]
         VEC --> MOB["Wireless Mobile Comset<br/>(100% Offline Hotspot / Urdu Voice / Screen Wakeup)"]
         VEC --> RF["Tactical RF Comset<br/>(5-Unit Encrypted Frequency Broadcast)"]
-        VEC --> VAULT["Forensic Evidence Vault<br/>(Continuous Pre-Roll MP4 Incursion Capture)"]
+        VEC --> VAULT["Forensic Evidence Vault<br/>(Pre-Roll Buffer / H.264 Fast-Start / HTTP 206 Streaming)"]
         VEC --> AUD["Local Siren / Audio Alerts"]
     end
 ```
@@ -88,12 +88,12 @@ Engineered for both **Network IP PTZ (ONVIF Profile S/T)** and **USB-Connected P
 * **Dynamic Bearing Synchronization:** As the camera rotates or zooms, the system calculates drone positions from:
   $$\text{Live Heading} = (\text{Mount Base Heading} + \text{Pan Motor Angle}) \pmod{360^\circ}$$
   Drone compass bearings, radar sweep needles, and GPS target positions adjust in real-time with zero manual typing.
-* **Dual-Port Network Architecture:** Isolates RTSP video streaming (`Port 554`) from ONVIF motor controls (`Port 80`), eliminating socket collision.
-* **Tactical Joystick & Nudge Pad:** On-screen D-Pad, 1-click cardinal sector pills (`NORTH`, `EAST`, `SOUTH`, `WEST`), and hardware **Keyboard Arrow Key shortcuts (`←`, `→`, `↑`, `↓`)** for seamless operators' control.
+* **Dual-Port Network Architecture:** Isolates RTSP video streaming (`Port 554`) from ONVIF motor controls (`Port 80`), eliminating socket collisions and interface timeouts.
+* **Tactical Joystick & Nudge Pad:** On-screen D-Pad, 1-click cardinal sector pills (`NORTH`, `EAST`, `SOUTH`, `WEST`), and hardware **Keyboard Arrow Key shortcuts (`←`, `→`, `↑`, `↓`)** for seamless operator control.
 
 ### 3. 📱 Wireless Mobile Tactical Alerting & Urdu Voice C2
 Field-tested for operating in forward, remote environments without internet access:
-* **100% Offline Hotspot Support:** Runs over local Wi-Fi or Windows Mobile Hotspot without requiring cellular data or cloud connections.
+* **100% Offline Hotspot Support:** Runs over local Wi-Fi or Windows Mobile Hotspot without requiring cellular data, SIM cards, or cloud connections.
 * **Wireless ADB Orchestrator (`alerting/mobile_comset.py`):** Wirelessly pairs with Android 11+ smartphones via pairing code and auto-detects ADB ports.
 * **Automated Screen Wakeup & Chrome Launch:** On confirmed threat incursion, the system sends a high-priority ADB keyevent to wake up the phone, unlock the screen, and launch the tactical alert interface in Chrome.
 * **Bilingual Urdu Voice Warning & Strobe Display:** Triggers a high-intensity full-screen red warning strobe accompanied by clear Urdu tactical audio: *"Khabardar! Faza mein Drone IED dakhil ho chuka hai!"* with tactical siren bursts.
@@ -116,12 +116,15 @@ Raw detections must clear a multi-frame temporal confirmation gate before escala
 * **Frame 8+ (Red):** `TARGET CONFIRMED LOCKED`
 To avoid false triggers during standby, camera reticles utilize non-circular tactical brackets that eliminate model hallucination on idle feeds.
 
-### 7. 📹 Continuous Forensic Evidence Vault with Pre-Roll Buffer
+### 7. 📹 Continuous Forensic Evidence Vault with Universal H.264 Streaming
 Every drone incursion is recorded into the Forensic Evidence Vault (`evidence/`):
-* **2-Second Pre-Roll Memory Buffer:** Maintains a rolling 60-frame RAM buffer capturing the critical seconds *before* detection.
+* **2-Second Pre-Roll Memory Buffer:** Maintains a rolling 60-frame RAM buffer capturing the critical seconds *before* detection lock.
 * **Single Contiguous Video per Incursion:** Continues tracking and recording until the drone completely exits the airspace (with an automated 2.5-second disappearance grace timer).
-* **Automated FFmpeg Web Remuxing:** Encodes videos as web-compatible MP4 files cataloged in `evidence/evidence_catalog.json`.
-* **Dashboard Vault (Tab 5):** Features a forensic video playback lightbox, metadata inspection, and instant download.
+* **Universal H.264 Fast-Start Web Transcoding:** Raw OpenCV frames written in `mp4v` are automatically converted via FFmpeg into standard **H.264 (`libx264`, `yuv420p`, `-preset ultrafast`, `-movflags +faststart`)** in < 0.4s. The `moov` atom is positioned at the file header, ensuring instant, lag-free playback in all HTML5 web browsers (Chrome, Edge, Safari, Firefox) without codec rejection (`MEDIA_ERR_SRC_NOT_SUPPORTED`).
+* **HTTP 206 Partial Content (Byte-Range) Streaming:** The Flask backend `/api/evidence/video` endpoint supports full RFC 7233 byte-range streaming (`Accept-Ranges: bytes`, `conditional=True`), allowing seamless seeking and scrubbing on the dashboard without loading stalls.
+* **On-the-Fly Codec Compatibility Fallback (`ensure_h264_compatibility`):** Automatically validates video codecs via `ffprobe` and dynamically transcodes any legacy or raw recordings to H.264 on-the-fly before serving.
+* **Dual-Directory Cataloging:** Recursively indexes active incursion captures (`evidence/`) as well as legacy recordings (`logs/evidence_videos/`) into `evidence_catalog.json` with high-res thumbnails.
+* **Interactive C2 Playback Lightbox (Tab 4):** Features one-click video playback with automated browser autoplay compliance (`muted`, `playsinline`), live loading status badges (`⏳ Loading Video...` ➔ `● Ready (5.0s HD)`), error handling, and direct MP4 downloads.
 
 ### 8. 🧰 Portable "Plug & Play" Bundle (`bin/platform-tools`)
 All necessary Android Debug Bridge (ADB) utilities are portably bundled directly inside `bin/platform-tools/`. Running `start_dashboard.bat` automatically prepends local platform tools to the runtime `%PATH%`, allowing zero-installation plug-and-play operation across any new Windows PC without administrative privileges or manual SDK setup.
@@ -165,15 +168,17 @@ anti-drone-telemetry-defense-system/
 │   └── tracker.py                   # DeepSORT tracker integration with Cosine Re-ID
 ├── evidence/                        # Active Forensic Evidence Vault
 │   ├── evidence_catalog.json        # Structured catalog of recorded drone incursions
-│   └── evidence_*.mp4               # Contiguous forensic MP4 incursion records
+│   └── evidence_*.mp4               # Contiguous forensic H.264 MP4 incursion records
 ├── laptop/                          # Local Hardware & Boresight Field Benchmarks
 │   ├── test_laptop_cam.py           # Real-time webcam telemetry & HUD visualization
 │   └── test_api.py                  # Headless REST / SSE API test harness
 ├── logging_system/                  # Archival, Evidence & Intelligence Logging
 │   ├── event_logger.py              # Ring-buffer & persistent JSONL event audit logger
-│   ├── evidence_recorder.py         # Rolling pre-roll buffer & continuous incursion recorder
+│   ├── evidence_recorder.py         # Rolling pre-roll buffer, incursion recorder & H.264 faststart remuxer
 │   └── snapshot_saver.py            # High-resolution forensic snapshot capture
 ├── logs/                            # Output directory for logs, snapshots & archived evidence
+│   ├── evidence_videos/             # Legacy forensic MP4 recordings
+│   └── snapshots/                   # Target JPEG snapshot stills
 ├── model/                           # Neural Network Weights (Custom Edge ONNX)
 │   ├── best.onnx                    # Custom-trained YOLO11m drone detection model
 │   └── best_int8.onnx               # Quantized INT8 weights for ultra-low latency edge
