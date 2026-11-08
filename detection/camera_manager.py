@@ -76,6 +76,11 @@ class CameraStream:
         Raises:
             RuntimeError: If video source fails to open.
         """
+        if self.source is None or str(self.source).strip().lower() in ("", "none", "null"):
+            logger.info("Camera '%s' unconfigured / idle. Awaiting configuration.", self.camera_id)
+            self._running = False
+            return
+
         self._cap = cv2.VideoCapture(self.source)
         if not self._cap.isOpened():
             raise RuntimeError(

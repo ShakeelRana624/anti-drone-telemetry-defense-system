@@ -1,17 +1,22 @@
 # 🛡️ Anti-Drone Telemetry & Autonomous Defense System
-### *Autonomous Military-Grade Counter-UAS Early Warning & 3D Spatial Tracking Platform*
+### *Autonomous Military-Grade Counter-UAS Early Warning, 3D Spatial Tracking & Mobile C2 Platform*
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-brightgreen.svg)](https://www.python.org/)
 [![Model: YOLO11](https://img.shields.io/badge/Inference-YOLO11%20%7C%20ONNX-orange.svg)](https://github.com/ultralytics/ultralytics)
 [![Tracking: DeepSORT](https://img.shields.io/badge/Tracker-DeepSORT%20Cosine%20Metric-purple.svg)](https://github.com/nwojke/deep_sort)
 [![Inference: SAHI Sliced](https://img.shields.io/badge/SAHI-Sliced%20Hyper%20Inference-crimson.svg)](https://github.com/obss/sahi)
+[![PTZ: ONVIF & USB UVC](https://img.shields.io/badge/PTZ%20Control-ONVIF%20%7C%20USB--UVC-blueviolet.svg)](#-tactical-ptz-motorized-camera-control--dynamic-compass-sync)
+[![Alerts: Wireless Mobile & Urdu Voice](https://img.shields.io/badge/Alerts-Wireless%20Mobile%20%7C%20Urdu%20Voice-red.svg)](#-wireless-mobile-tactical-alerting--urdu-voice-c2)
+[![Network: 100% Offline Hotspot](https://img.shields.io/badge/Network-100%25%20Offline%20Hotspot-success.svg)](#-wireless-mobile-tactical-alerting--urdu-voice-c2)
 
 ---
 
 ## 🎯 Executive Overview
 
-The **Anti-Drone Telemetry & Autonomous Defense System** is a production-grade, edge-deployable counter-UAS (Unmanned Aerial System) intelligence and early warning solution. Engineered for sovereign perimeter defense, border surveillance, and critical airspace infrastructure, the system autonomously detects low-RCS (Radar Cross Section) micro/mini drones, tracks them across camera boundaries, and dynamically computes full **3D spatial telemetry vectors**—including **True Compass Bearing**, **Optical Slant Distance**, **Altitude**, and **WGS-84 Geodetic GPS Coordinates**.
+The **Anti-Drone Telemetry & Autonomous Defense System** is a production-grade, edge-deployable counter-UAS (Unmanned Aerial System) intelligence, spatial tracking, and early warning solution. Engineered for sovereign perimeter defense, border surveillance, and critical airspace infrastructure, the system autonomously detects low-RCS (Radar Cross Section) micro/mini drones, tracks them across camera boundaries, and dynamically computes full **3D spatial telemetry vectors**—including **True Compass Bearing**, **Optical Slant Distance**, **Altitude**, and **WGS-84 Geodetic GPS Coordinates**.
+
+The platform features an integrated **Motorized PTZ (Pan-Tilt-Zoom) Camera Subsystem with Dynamic Compass Angle Tracking**, a **100% Offline Mobile Tactical Early Warning System with Urdu Voice Warnings**, and an automated **Continuous Forensic Evidence Vault with Pre-Roll Buffering**.
 
 ---
 
@@ -28,20 +33,22 @@ Below is an operational demonstration of the detection and spatial telemetry pip
 
 ## 📐 System Architecture
 
-The system operates across a modular, multi-threaded pipeline decoupled between camera ingestion, deep inference, spatial kinematics, temporal decision logic, and command-and-control (C2) dissemination:
+The system operates across a modular, multi-threaded pipeline decoupled between camera ingestion, deep inference, spatial kinematics, temporal decision logic, motorized PTZ tracking, and command-and-control (C2) dissemination:
 
 ```mermaid
 graph TD
-    subgraph SENSORS ["1. Multi-Sensor Ingestion Layer"]
-        CAM1["Primary Optical / PTZ Camera<br/>(RTSP / DirectShow / File)"]
+    subgraph SENSORS ["1. Multi-Sensor & PTZ Ingestion Layer"]
+        CAM1["Primary Optical / PTZ Camera<br/>(RTSP Port 554 / USB DirectShow / File)"]
         CAM2["Secondary Thermal FLIR Camera<br/>(RTSP / Low-Light Sensor)"]
+        PTZC["PTZ Motor Controller<br/>(ONVIF Port 80 / USB UVC / Dynamic Heading Sync)"]
         IMGR["IP Camera Manager<br/>(Multi-Threaded Double Buffered)"]
         CAM1 --> IMGR
         CAM2 --> IMGR
+        PTZC <--> CAM1
     end
 
     subgraph INFERENCE ["2. Deep Learning Detection Layer"]
-        IMGR --> SAHI["SAHI Engine<br/>(Sliced Overlapping Windows)"]
+        IMGR --> SAHI["SAHI Engine<br/>(Sliced Overlapping 640px Windows)"]
         SAHI --> YOLO["YOLO11 ONNX / TensorRT<br/>(Sub-10ms Nano/Medium)"]
         YOLO --> TTA["Test-Time Augmentation (TTA)<br/>Multi-Scale Feature Merge"]
         TTA --> NMS["Soft-NMS Box Fusion"]
@@ -57,13 +64,15 @@ graph TD
         DE --> DIST["Optical Distance Estimator<br/>(Pinhole Triangle-Similarity)"]
         BC & DIST --> GPS["WGS-84 Vincenty Direct Projection<br/>(Sub-Millimeter Drone GPS Lat/Lon)"]
         GPS --> VEC["Speed Vectoring & Velocity Estimator<br/>(3D Delta / Temporal Delta-T)"]
+        PTZC -.->|Live Dynamic Heading Sync| BC
     end
 
     subgraph C2 ["5. Command, Control & Alerting (C2)"]
-        VEC --> DASH["Tactical Web Dashboard<br/>(Live Radar Sweep & Active Target Table)"]
+        VEC --> DASH["Tactical Web C2 Dashboard<br/>(Live Radar Scope & Active Target Table)"]
+        VEC --> MOB["Wireless Mobile Comset<br/>(100% Offline Hotspot / Urdu Voice / Screen Wakeup)"]
         VEC --> RF["Tactical RF Comset<br/>(5-Unit Encrypted Frequency Broadcast)"]
-        VEC --> VAULT["Forensic Evidence Vault<br/>(Automated 5s MP4 Clips & Snapshot Archive)"]
-        VEC --> AUD["Local Siren / Telegram / Audio Alerts"]
+        VEC --> VAULT["Forensic Evidence Vault<br/>(Continuous Pre-Roll MP4 Incursion Capture)"]
+        VEC --> AUD["Local Siren / Audio Alerts"]
     end
 ```
 
@@ -74,27 +83,48 @@ graph TD
 ### 1. 🔍 SAHI-Powered Sliced Detection (Zero Small-Target Loss)
 Traditional computer vision architectures downsample 4K/1080p feeds to 640×640, reducing distant micro-drones to indistinct 4-pixel blurs. This system incorporates **SAHI (Slicing Aided Hyper Inference)** with customizable tile overlaps, detecting high-altitude and long-range UAVs at 5× the operational range of vanilla YOLO models.
 
-### 2. 🧭 True Compass Bearing & 16-Point Cardinal Tracking
+### 2. 🔄 Tactical PTZ Motorized Camera Control & Dynamic Compass Sync
+Engineered for both **Network IP PTZ (ONVIF Profile S/T)** and **USB-Connected PTZ Webcams (UVC DirectShow)**:
+* **Dynamic Bearing Synchronization:** As the camera rotates or zooms, the system calculates drone positions from:
+  $$\text{Live Heading} = (\text{Mount Base Heading} + \text{Pan Motor Angle}) \pmod{360^\circ}$$
+  Drone compass bearings, radar sweep needles, and GPS target positions adjust in real-time with zero manual typing.
+* **Dual-Port Network Architecture:** Isolates RTSP video streaming (`Port 554`) from ONVIF motor controls (`Port 80`), eliminating socket collision.
+* **Tactical Joystick & Nudge Pad:** On-screen D-Pad, 1-click cardinal sector pills (`NORTH`, `EAST`, `SOUTH`, `WEST`), and hardware **Keyboard Arrow Key shortcuts (`←`, `→`, `↑`, `↓`)** for seamless operators' control.
+
+### 3. 📱 Wireless Mobile Tactical Alerting & Urdu Voice C2
+Field-tested for operating in forward, remote environments without internet access:
+* **100% Offline Hotspot Support:** Runs over local Wi-Fi or Windows Mobile Hotspot without requiring cellular data or cloud connections.
+* **Wireless ADB Orchestrator (`alerting/mobile_comset.py`):** Wirelessly pairs with Android 11+ smartphones via pairing code and auto-detects ADB ports.
+* **Automated Screen Wakeup & Chrome Launch:** On confirmed threat incursion, the system sends a high-priority ADB keyevent to wake up the phone, unlock the screen, and launch the tactical alert interface in Chrome.
+* **Bilingual Urdu Voice Warning & Strobe Display:** Triggers a high-intensity full-screen red warning strobe accompanied by clear Urdu tactical audio: *"Khabardar! Faza mein Drone IED dakhil ho chuka hai!"* with tactical siren bursts.
+* **Single-Reload Lock:** Prevents repetitive browser reload spam during active incursions.
+
+### 4. 🧭 True Compass Bearing & 16-Point Cardinal Tracking
 The system synchronizes camera boresight direction with true North ($0^\circ-360^\circ$). As a drone maneuvers across the field of view:
 * Evaluates lens-relative azimuth $(\theta_{az})$ and optical elevation $(\phi_{el})$.
 * Computes real-world **True Compass Bearing**:
   $$\text{BRG} = (\text{Camera Heading} + \theta_{az}) \pmod{360^\circ}$$
 * Automatically translates numeric angles to operational military quadrants (`N`, `NNE`, `NE`, `ENE`, `E`, `ESE`, `SE`, `SSE`, `S`, `SSW`, `SW`, `WSW`, `W`, `WNW`, `NW`, `NNW`).
 
-### 3. 📍 WGS-84 Geodetic Target GPS Projection
+### 5. 📍 WGS-84 Geodetic Target GPS Projection
 Given the host camera's georeferenced coordinates and computed optical range, the system projects the aerial drone's real-time geographic location using **Vincenty's Direct Geodesic Algorithm** on the WGS-84 terrestrial ellipsoid, producing high-precision Latitude and Longitude coordinates.
 
-### 4. 🎯 False-Positive Suppression Decision Engine
-To safeguard against false triggers caused by birds, insects, or background aircraft, raw detections must clear a rigorous **Multi-Frame Temporal Confirmation Gate** (8 consecutive verified frames + DeepSORT IoU/Cosine appearance consistency) before escalating from `ACQUIRING` $\rightarrow$ `SUSPICIOUS` $\rightarrow$ `LOCKED THREAT`.
+### 6. 🎯 False-Positive Suppression Decision Engine
+Raw detections must clear a multi-frame temporal confirmation gate before escalating to an alert:
+* **Frames 1–3 (Cyan):** `ACQUIRING`
+* **Frames 4–6 (Yellow):** `CONFIRMING LOCK`
+* **Frame 8+ (Red):** `TARGET CONFIRMED LOCKED`
+To avoid false triggers during standby, camera reticles utilize non-circular tactical brackets that eliminate model hallucination on idle feeds.
 
-### 5. 📻 Tactical RF Comset & Alert Dispatcher
-Integrated multi-channel early warning subsystem:
-* Broadcasts emergency threat alerts across 5 tactical military radio units with sub-millisecond latency.
-* Auto-triggers local siren buzzers and dispatch notifications to command centers.
-* Streams telemetry data via SSE (Server-Sent Events) to the operator dashboard.
+### 7. 📹 Continuous Forensic Evidence Vault with Pre-Roll Buffer
+Every drone incursion is recorded into the Forensic Evidence Vault (`evidence/`):
+* **2-Second Pre-Roll Memory Buffer:** Maintains a rolling 60-frame RAM buffer capturing the critical seconds *before* detection.
+* **Single Contiguous Video per Incursion:** Continues tracking and recording until the drone completely exits the airspace (with an automated 2.5-second disappearance grace timer).
+* **Automated FFmpeg Web Remuxing:** Encodes videos as web-compatible MP4 files cataloged in `evidence/evidence_catalog.json`.
+* **Dashboard Vault (Tab 5):** Features a forensic video playback lightbox, metadata inspection, and instant download.
 
-### 6. 📹 Automated Forensic Evidence Vault
-Every confirmed intrusion event triggers the background `EvidenceRecorder`, generating a watermarked 5-second MP4 video clip and forensic metadata record (Case ID, Timestamp, Bearing, Range, Target GPS, Camera ID) archived in `logs/evidence_videos/`.
+### 8. 🧰 Portable "Plug & Play" Bundle (`bin/platform-tools`)
+All necessary Android Debug Bridge (ADB) utilities are portably bundled directly inside `bin/platform-tools/`. Running `start_dashboard.bat` automatically prepends local platform tools to the runtime `%PATH%`, allowing zero-installation plug-and-play operation across any new Windows PC without administrative privileges or manual SDK setup.
 
 ---
 
@@ -104,36 +134,48 @@ Every confirmed intrusion event triggers the background `EvidenceRecorder`, gene
 anti-drone-telemetry-defense-system/
 ├── alerting/                        # Early Warning & Defense Dispatch Subsystem
 │   ├── alert_manager.py             # Multi-channel alert dispatcher (Audio/Telegram/RF)
+│   ├── mobile_comset.py             # Wireless Android ADB orchestrator & Hotspot alert manager
 │   └── rf_comset.py                 # Tactical 5-unit RF Comset frequency integration
+├── bin/                             # Portable Binary Dependencies (Zero-Install Setup)
+│   └── platform-tools/              # Bundled ADB executable & runtime DLLs
 ├── camera_int/                      # Multi-Sensor & Dual-Camera Ingestion Layer
 │   ├── camera_config.py             # Dynamic camera coordinate & RTSP manager
-│   ├── ip_manager.py                # Dual-stream controller & hot-reload pipeline
-│   └── ip_stream.py                 # Resilient TCP/RTSP capture thread & fallback HUD
-├── config/                          # Centralized Military Parameter Specifications
-│   └── config.yaml                  # Detection thresholds, camera headings, FOV & ports
+│   ├── cameras_config.json          # Persistent camera hardware & geographic profiles
+│   ├── ip_manager.py                # Dual-stream controller, probe engine & hot-reload pipeline
+│   ├── ip_stream.py                 # Resilient TCP/RTSP capture thread & fallback HUD
+│   └── ptz_controller.py            # Motorized PTZ controller (ONVIF/UVC) & dynamic heading sync
+├── config/                          # Centralized Parameter Specifications
+│   ├── config.yaml                  # Detection thresholds, camera headings, FOV & ports
+│   └── mobile_config.json           # Paired mobile phone address & alert preferences
 ├── dashboard/                       # Tactical Operator C2 Airspace Dashboard
 │   ├── app.py                       # High-throughput Flask backend & SSE event bus
 │   ├── static/                      # Styling & tactical CRT radar styling (style.css)
-│   └── templates/                   # Interactive dashboard frontend (index.html)
+│   │   └── audio/                   # Tactical sirens & Urdu voice alert recordings
+│   └── templates/                   # Interactive dashboard frontend
+│       ├── index.html               # Main C2 tactical surveillance console
+│       └── mobile_alert.html        # Responsive full-screen mobile tactical strobe alert
 ├── data/                            # Dataset configurations & label schema
 │   └── dataset.yaml                 # YOLO class definitions & training paths
 ├── detection/                       # Deep Learning & Vision Core
 │   ├── camera_manager.py            # Stream ingestion & frame dispatcher
 │   ├── decision_engine.py           # Multi-frame false-alarm suppression state machine
 │   ├── detector.py                  # DroneDetector pipeline (YOLO11 + SAHI + DeepSORT)
+│   ├── live_inference.py            # High-FPS real-time inference worker & HUD overlay
 │   ├── sahi_engine.py               # Slicing-aided tiled inference & box fusions
 │   └── tracker.py                   # DeepSORT tracker integration with Cosine Re-ID
+├── evidence/                        # Active Forensic Evidence Vault
+│   ├── evidence_catalog.json        # Structured catalog of recorded drone incursions
+│   └── evidence_*.mp4               # Contiguous forensic MP4 incursion records
 ├── laptop/                          # Local Hardware & Boresight Field Benchmarks
 │   ├── test_laptop_cam.py           # Real-time webcam telemetry & HUD visualization
 │   └── test_api.py                  # Headless REST / SSE API test harness
 ├── logging_system/                  # Archival, Evidence & Intelligence Logging
 │   ├── event_logger.py              # Ring-buffer & persistent JSONL event audit logger
-│   ├── evidence_recorder.py         # Autonomous 5-second MP4 evidence video generator
+│   ├── evidence_recorder.py         # Rolling pre-roll buffer & continuous incursion recorder
 │   └── snapshot_saver.py            # High-resolution forensic snapshot capture
-├── logs/                            # Output directory for logs, snapshots & evidence
-│   └── evidence_videos/             # Forensic MP4 recordings
+├── logs/                            # Output directory for logs, snapshots & archived evidence
 ├── model/                           # Neural Network Weights (Custom Edge ONNX)
-│   ├── best.onnx                    # Trained YOLO11 custom drone weights (FP16/FP32)
+│   ├── best.onnx                    # Custom-trained YOLO11m drone detection model
 │   └── best_int8.onnx               # Quantized INT8 weights for ultra-low latency edge
 ├── output_videos/                   # Processed Demo Media & Visual Artifacts
 │   ├── demo.gif                     # Live animated demonstration
@@ -150,6 +192,7 @@ anti-drone-telemetry-defense-system/
 │   └── system_health.py             # CPU, GPU, memory, and thermal watchdog monitor
 ├── main.py                          # Primary multi-threaded system orchestrator
 ├── process_video.py                 # Offline video batch processor & annotator
+├── start_dashboard.bat              # One-click portable Windows launcher
 ├── requirements.txt                 # Pinned dependencies
 ├── LICENSE                          # Official Apache-2.0 License
 └── README.md                        # Project documentation
@@ -189,9 +232,11 @@ Compound Line-of-Sight (LOS) angular divergence:
 
 $$\theta_{LOS} = \sqrt{\theta_{azimuth}^2 + \phi_{elevation}^2}$$
 
-Given physical camera compass heading $\alpha_{cam}$, the **True Compass Bearing** is:
+Given base camera mount heading $\alpha_{mount}$ and current PTZ pan motor angle $\Delta \theta_{pan}$, the **True Compass Bearing** is dynamically calculated as:
 
-$$\text{BRG}_{true} = (\alpha_{cam} + \theta_{azimuth}) \pmod{360^\circ}$$
+$$\text{Live Heading} = (\alpha_{mount} + \Delta \theta_{pan}) \pmod{360^\circ}$$
+
+$$\text{BRG}_{true} = (\text{Live Heading} + \theta_{azimuth}) \pmod{360^\circ}$$
 
 ---
 
@@ -223,12 +268,23 @@ $$v_{ground} = \frac{\sqrt{(x_2 - x_1)^2 + (y_2 - y_1)^2}}{\Delta t}, \quad v_{3
 
 ## 🚀 Installation & Quick Start
 
-### 1. Clone Repository & Environment Setup
+### 1. Clone Repository
 ```bash
 git clone https://github.com/ShakeelRana624/anti-drone-telemetry-defense-system.git
 cd anti-drone-telemetry-defense-system
+```
 
-# Create isolated Python virtual environment
+### 2. Portable Plug-and-Play Launch (Recommended for Windows)
+Double-click:
+```cmd
+start_dashboard.bat
+```
+* **Auto-Dependency Check:** Detects Python and verifies dependencies automatically.
+* **Portable Tools:** Auto-registers bundled `bin/platform-tools/adb.exe` into runtime `%PATH%`.
+* **Zero Configuration:** Launches the Tactical Web C2 Dashboard at `http://127.0.0.1:5000` and automatically opens your browser.
+
+### 3. Manual Virtual Environment Setup (Cross-Platform)
+```bash
 python -m venv venv
 # Windows:
 venv\Scripts\activate
@@ -237,24 +293,30 @@ source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Run main orchestrator
+python dashboard/app.py
 ```
 
-### 2. Run Autonomous Defense System (Full Architecture)
+### 4. Process & Annotate Video Files (Offline Mode)
 ```bash
-python main.py
-```
-* Spawns multi-threaded camera ingestion, neural detection, tracking, and telemetry engines.
-* Launches Tactical Web C2 Dashboard at `http://localhost:5000`.
-
-### 3. Process & Annotate Video Files (Offline Mode)
-```bash
-python process_video.py --input test_videos/input.mp4 --output output_videos/detected.mp4 --heading 90.0
+python process_video.py --input test_videos/input.mp4 --output output_videos/input_detected.mp4 --cam-lat 34.052484 --cam-lon 71.986260 --heading 90.0
 ```
 
-### 4. Test Live Camera Feed with Tactical HUD
-```bash
-python laptop/test_laptop_cam.py --camera 0 --heading 90.0
-```
+### 5. Connecting PTZ IP Cameras via Direct Ethernet
+When connecting an IP camera directly to your laptop's Ethernet port:
+1. Open Windows Network Connections (`ncpa.cpl`).
+2. Set Ethernet IPv4 to static IP:
+   * **IP Address:** `192.168.1.50`
+   * **Subnet Mask:** `255.255.255.0`
+   * **Default Gateway:** `192.168.1.1`
+3. In Dashboard Tab 4:
+   * **Connection Mode:** `PTZ Motorized Camera`
+   * **Camera IP:** `192.168.1.7` (or your camera's IP)
+   * **RTSP Video Port:** `554`
+   * **PTZ ONVIF Control Port:** `80`
+   * **RTSP Path:** `/stream1`
+   * Click **Save Configuration & Deploy Camera**.
 
 ---
 

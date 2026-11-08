@@ -74,6 +74,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.93 19.07A10 10 0 0 1 19.07 4.93M7.76 16.24A6 6 0 0 1 16.24 7.76M12 12h.01"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83"/></svg>
           📡 RF Comset &amp; Siren Setup
         </button>
+        <button class="tab-btn" data-tab="tab-mobile-alert" role="tab">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+          📱 Mobile Alert &amp; Wireless Setup
+        </button>
       </div>
 
       <!-- Live Status & Clock -->
@@ -239,6 +243,9 @@
                 <button class="ctrl-btn" onclick="captureSnapshot('cam1')">📷 Snap</button>
                 <button class="ctrl-btn active">Optical HD 1080p</button>
                 <button class="ctrl-btn" onclick="toggleNightFilter('cam1')">🌙 Low-Light</button>
+                <button class="ctrl-btn" onclick="ptzMove('left')" title="Pan Left (Shift Heading -5°)" style="border-left:1px solid rgba(255,255,255,0.15); margin-left:0.3rem;">◀ Pan</button>
+                <button class="ctrl-btn" onclick="ptzMove('right')" title="Pan Right (Shift Heading +5°)">Pan ▶</button>
+                <button class="ctrl-btn" onclick="ptzMove('home')" title="Reset Heading to Base Mount">⌂ Center</button>
               </div>
               <div class="camera-meta">
                 <span>LATENCY: 12ms</span>
@@ -482,10 +489,10 @@
         </button>
       </div>
 
-      <!-- Plotly Charts Grid -->
+      <!-- Plotly Charts Grid: Chart 1 on top (full width), Charts 2-5 in 2-by-2 rows -->
       <div class="charts-grid">
         
-        <!-- Chart 1: Primary Timeline Plot (Weekly/Monthly/Yearly Incursions) -->
+        <!-- Chart 1: Primary Timeline Plot (Weekly/Monthly/Yearly Incursions) - Top Row Full Width -->
         <div class="chart-card chart-card--full">
           <div class="chart-card__header">
             <div>
@@ -497,46 +504,50 @@
           <div class="chart-container" id="plotly-main-timeline"></div>
         </div>
 
-        <!-- Chart 2: Threat Classification & Composition -->
+        <!-- Chart 2: Threat Classification & Composition - Row 2 Left -->
         <div class="chart-card">
           <div class="chart-card__header">
             <div>
               <h3 class="chart-card__title">Drone Threat Categorization</h3>
               <p class="chart-card__subtitle">Quadcopter, Fixed-Wing, Micro-FPV, and Stealth UAV distribution</p>
             </div>
+            <span class="meta-pill" style="color:var(--color-accent);">THREAT SPECTRUM</span>
           </div>
           <div class="chart-container" id="plotly-threat-composition"></div>
         </div>
 
-        <!-- Chart 3: 360° Directional Bearing Radar (Azimuth Polar Plot) -->
+        <!-- Chart 3: 360° Directional Bearing Radar (Azimuth Polar Plot) - Row 2 Right -->
         <div class="chart-card">
           <div class="chart-card__header">
             <div>
               <h3 class="chart-card__title">360° Threat Bearing Radar (Azimuth Angle)</h3>
               <p class="chart-card__subtitle">Polar directional distribution of detected drone flight paths</p>
             </div>
+            <span class="meta-pill" style="color:var(--color-accent);">POLAR RADAR</span>
           </div>
           <div class="chart-container" id="plotly-bearing-polar"></div>
         </div>
 
-        <!-- Chart 4: 24-Hour Peak Incursion Windows -->
+        <!-- Chart 4: 24-Hour Peak Incursion Windows - Row 3 Left -->
         <div class="chart-card">
           <div class="chart-card__header">
             <div>
               <h3 class="chart-card__title">24-Hour Risk Distribution &amp; Dusk Vulnerability</h3>
               <p class="chart-card__subtitle">Hourly threat density identifying high-risk patrol windows</p>
             </div>
+            <span class="meta-pill" style="color:var(--color-accent);">24-HR TIMELINE</span>
           </div>
           <div class="chart-container" id="plotly-hourly-heatmap"></div>
         </div>
 
-        <!-- Chart 5: System Operational Capability Spider Radar -->
+        <!-- Chart 5: System Operational Capability Spider Radar - Row 3 Right -->
         <div class="chart-card">
           <div class="chart-card__header">
             <div>
               <h3 class="chart-card__title">Autonomous Defense Capability Assessment</h3>
               <p class="chart-card__subtitle">Sensitivity, tracking stability, weather tolerance &amp; response latency</p>
             </div>
+            <span class="meta-pill" style="color:var(--color-accent);">CAPABILITY SPIDER</span>
           </div>
           <div class="chart-container" id="plotly-capability-radar"></div>
         </div>
@@ -697,7 +708,7 @@
       <!-- Video Vault Section -->
       <div style="margin-bottom:2.5rem;">
         <div class="evidence-section-title">
-          <span>🎬</span> Automatically Recorded MP4 Evidence Clips (Saved to logs/evidence_videos/)
+          <span>🎬</span> Automatically Recorded MP4 Evidence Clips (Saved to evidence/)
         </div>
         <div class="evidence-video-grid" id="evidence-video-container">
           <!-- Dynamically populated evidence video cards -->
@@ -822,11 +833,11 @@
                 Drone compass bearings and radar sweep needles adjust dynamically in real time.
               </p>
 
-              <!-- PTZ Network Parameters -->
-              <div class="form-grid-2col" style="margin-bottom:0.8rem;">
+              <!-- PTZ Network Parameters (Shown only for IP/ONVIF PTZ) -->
+              <div id="ptz-net-fields" class="form-grid-2col" style="margin-bottom:0.8rem;">
                 <div class="control-field">
                   <label for="ptz-ip">PTZ Camera IP Address</label>
-                  <input class="control-input" type="text" id="ptz-ip" placeholder="192.168.1.101" />
+                  <input class="control-input" type="text" id="ptz-ip" placeholder="192.168.1.101" oninput="if(document.getElementById('cam-ip')) document.getElementById('cam-ip').value = this.value.trim();" />
                 </div>
                 <div class="control-field">
                   <label for="ptz-protocol">Control Protocol</label>
@@ -841,15 +852,17 @@
                   <label for="ptz-port">PTZ Control Port</label>
                   <input class="control-input" type="number" id="ptz-port" value="80" placeholder="80 or 8000" />
                 </div>
-                <div class="control-field">
-                  <label for="ptz-speed">Motor Rotation Speed</label>
-                  <select class="control-select" id="ptz-speed">
-                    <option value="0.5">0.5x — Smooth Precision Slew (2.5°/step)</option>
-                    <option value="1.0" selected>1.0x — Standard Surveillance Slew (5.0°/step)</option>
-                    <option value="1.5">1.5x — High-Speed Tactical Tracking (7.5°/step)</option>
-                    <option value="2.0">2.0x — Rapid Interceptor Sweep (10.0°/step)</option>
-                  </select>
-                </div>
+              </div>
+
+              <!-- Speed and Step Selector (Common for both USB & IP) -->
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem; background:rgba(0,0,0,0.25); padding:0.5rem 0.8rem; border-radius:var(--radius-sm); border:1px solid rgba(255,255,255,0.06);">
+                <label for="ptz-speed" style="font-size:0.8rem; color:var(--color-muted); margin:0;">🕹️ Rotation Step / Slew Speed:</label>
+                <select class="control-select" id="ptz-speed" style="width:auto; min-width:240px; padding:0.3rem 0.6rem; font-size:0.78rem;">
+                  <option value="0.5">0.5x — Smooth Precision Slew (2.5°/step)</option>
+                  <option value="1.0" selected>1.0x — Standard Surveillance Slew (5.0°/step)</option>
+                  <option value="1.5">1.5x — High-Speed Tactical Tracking (7.5°/step)</option>
+                  <option value="2.0">2.0x — Rapid Interceptor Sweep (10.0°/step)</option>
+                </select>
               </div>
 
               <!-- Tactical PTZ Joystick / Directional Nudge Pad -->
@@ -924,7 +937,7 @@
               <div class="form-grid-2col" style="margin-bottom:0;">
                 <div class="control-field">
                   <label for="cam-ip">Camera IP Address</label>
-                  <input class="control-input" type="text" id="cam-ip" placeholder="192.168.1.101" />
+                  <input class="control-input" type="text" id="cam-ip" placeholder="192.168.1.101" oninput="if(document.getElementById('ptz-ip')) document.getElementById('ptz-ip').value = this.value.trim();" />
                   <div class="form-hint">Local IP of CCTV / IP Camera.</div>
                 </div>
 
@@ -1346,6 +1359,176 @@
 
     </div>
 
+    <!-- ═════════════════════════════════════════════════════════ -->
+    <!-- TAB 7: MOBILE TACTICAL ALERT & WIRELESS PHONE SETUP       -->
+    <!-- ═════════════════════════════════════════════════════════ -->
+    <div class="tab-content" id="tab-mobile-alert">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">
+            <span>📱</span> Tactical Mobile Audio Alert // Wireless Android ADB &amp; Auto-Launch Setup
+          </h2>
+          <p style="font-size:0.75rem; color:var(--color-muted); margin-top:0.2rem;">
+            Pair your mobile phone wirelessly over local Wi-Fi. When hostile drones are detected by AI, the system automatically wakes up the mobile phone, opens the tactical alert screen in Chrome, and broadcasts the 15-second repeated Urdu voice warning.
+          </p>
+        </div>
+        <div style="display:flex; gap:0.5rem;">
+          <button class="btn-export" onclick="loadMobileAlertStatus()">
+            <span>🔄</span> Refresh Mobile Status
+          </button>
+        </div>
+      </div>
+
+      <!-- Main Controls Row -->
+      <div class="camera-setup-workspace" style="margin-bottom:1.5rem;">
+        
+        <!-- Left: Wireless Phone Configuration & Pairing -->
+        <div class="setup-card">
+          <div class="setup-card__header">
+            <h3 class="setup-card__title">
+              <span>📶</span> Android Wireless Pairing (ADB Link)
+            </h3>
+            <span class="meta-pill" style="color:var(--color-muted);" id="mobile-model-pill">Auto-Detecting Device...</span>
+          </div>
+
+          <div class="setup-status-box">
+            <div>
+              <div style="font-size:0.7rem; color:var(--color-muted); text-transform:uppercase; font-weight:600;">Phone Wireless Link Status</div>
+              <div style="font-size:0.88rem; font-weight:700; color:var(--color-light); margin-top:0.15rem;" id="mobile-status-text">
+                Checking Wireless Device Link...
+              </div>
+            </div>
+            <div id="mobile-conn-badge">
+              <span class="status-indicator-tag status-indicator-tag--online">
+                <span class="status-dot"></span> LINK ACTIVE
+              </span>
+            </div>
+          </div>
+
+          <!-- Configuration Form -->
+          <div class="form-grid-2col">
+            <div class="control-field">
+              <label for="mobile-ip-port">Device IP &amp; Pairing Port</label>
+              <input type="text" id="mobile-ip-port" placeholder="10.196.162.171:39527" value="10.196.162.171:39527" />
+              <small style="font-size:0.68rem; color:var(--color-muted);">From Phone: Developer Options → Wireless Debugging → "Pair with code"</small>
+            </div>
+
+            <div class="control-field">
+              <label for="mobile-pair-code">6-Digit Pairing Code</label>
+              <input type="text" id="mobile-pair-code" placeholder="e.g. 539085" maxlength="6" />
+              <small style="font-size:0.68rem; color:var(--color-muted);">6-digit code shown on Android pairing popup</small>
+            </div>
+
+            <div class="control-field">
+              <label for="mobile-conn-port">Active Connection Port</label>
+              <input type="text" id="mobile-conn-port" placeholder="Auto-detect or e.g. 36777" value="36777" />
+              <small style="font-size:0.68rem; color:var(--color-muted);">Main port shown under 'IP address &amp; Port'</small>
+            </div>
+
+            <div class="control-field">
+              <label for="mobile-alert-url">Target Alert Screen URL</label>
+              <input type="text" id="mobile-alert-url" value="http://10.196.162.35:5000/alert" readonly style="background:rgba(0,0,0,0.3); color:#38bdf8;" />
+              <small style="font-size:0.68rem; color:var(--color-muted);">Direct local Wi-Fi link to Tactical Alert Screen</small>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div style="display:flex; gap:0.6rem; margin-top:1.2rem; flex-wrap:wrap;">
+            <button class="ctrl-btn active" id="btn-pair-mobile" onclick="pairMobileDevice()" style="background:linear-gradient(135deg, #10b981 0%, #059669 100%);">
+              <span>🔗</span> Pair &amp; Connect Phone
+            </button>
+            <button class="ctrl-btn" id="btn-launch-mobile" onclick="launchAlertOnMobile()" style="border-color:#38bdf8; color:#38bdf8;">
+              <span>🚀</span> Auto-Open Chrome on Phone
+            </button>
+            <button class="ctrl-btn" onclick="disconnectMobileDevice()" style="border-color:rgba(255,255,255,0.2);">
+              <span>🔌</span> Disconnect
+            </button>
+          </div>
+
+          <!-- Feedback Status Banner -->
+          <div id="mobile-pair-banner" style="display:none; margin-top:1rem; padding:0.8rem; border-radius:8px; font-size:0.82rem; font-weight:600;"></div>
+        </div>
+
+        <!-- Right: Mobile Tactical Alert Broadcast & Audio Engine -->
+        <div class="setup-card">
+          <div class="setup-card__header">
+            <h3 class="setup-card__title">
+              <span>📢</span> Mobile Tactical Voice Alert Engine
+            </h3>
+            <span class="meta-pill" style="color:var(--color-crimson);">15-SEC URDU IED AUDIO</span>
+          </div>
+
+          <div class="setup-status-box">
+            <div>
+              <div style="font-size:0.7rem; color:var(--color-muted); text-transform:uppercase; font-weight:600;">Alert Audio Pipeline</div>
+              <div style="font-size:0.88rem; font-weight:700; color:var(--color-light); margin-top:0.15rem;">
+                Urdu Voice Siren Alert Active (2x Loop)
+              </div>
+            </div>
+            <div>
+              <span class="status-indicator-tag status-indicator-tag--online">
+                <span class="status-dot"></span> BROADCAST READY
+              </span>
+            </div>
+          </div>
+
+          <!-- Audio Message Preview Box -->
+          <div style="background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:1rem; margin-bottom:1rem;">
+            <div style="font-size:0.75rem; color:var(--color-muted); font-weight:600; text-transform:uppercase; margin-bottom:0.4rem;">Emergency Urdu Broadcast Message</div>
+            <div style="font-size:1.1rem; line-height:1.7; color:#fecaca; font-family:'Noto Nastaliq Urdu', serif; direction:rtl; text-align:right;">
+              "خبردار! ڈرون آئی ای ڈی ڈیٹیکٹ ہو گئی ہے! تمام لوگ اوور ہیڈ پروٹیکشن لیں۔"
+            </div>
+            <div style="font-size:0.72rem; color:var(--color-muted); margin-top:0.4rem;">
+              Duration: 14.8s • Normalized +6dB Volume Boost • High-Priority Mobile Push
+            </div>
+          </div>
+
+          <!-- Direct Link Quick Access Box -->
+          <div style="background:rgba(56, 189, 248, 0.08); border:1px solid rgba(56, 189, 248, 0.25); border-radius:10px; padding:0.9rem; margin-bottom:1.2rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <div style="font-size:0.75rem; color:#38bdf8; font-weight:700;">DIRECT MOBILE LINK (LOCAL WI-FI)</div>
+                <div style="font-size:0.88rem; color:#fff; font-family:var(--font-mono); margin-top:0.2rem;" id="mobile-direct-link-text">http://10.196.162.35:5000/alert</div>
+              </div>
+              <div style="display:flex; gap:0.4rem;">
+                <button class="ctrl-btn" onclick="copyMobileLink()" style="font-size:0.75rem; padding:0.35rem 0.7rem;">📋 Copy</button>
+                <a href="/alert" target="_blank" class="ctrl-btn" style="font-size:0.75rem; padding:0.35rem 0.7rem; text-decoration:none; display:inline-flex; align-items:center;">↗ Open</a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Threat Simulation Actions -->
+          <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
+            <button class="ctrl-btn active" onclick="testMobileUrduAlert()" style="background:var(--color-crimson); border-color:#ff4d4d; color:#fff;">
+              <span>🚨</span> Fire Live Urdu IED Alert (15s)
+            </button>
+            <button class="ctrl-btn" onclick="dismissMobileAlert()" style="border-color:rgba(255,255,255,0.2);">
+              <span>🔕</span> Silence / Dismiss Alert
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Mobile Transmission Activity Log -->
+      <div class="setup-card" style="margin-top:1.5rem;">
+        <div class="setup-card__header">
+          <h3 class="setup-card__title">
+            <span>📋</span> Mobile Alert Dispatch &amp; ADB Event Log
+          </h3>
+          <span style="font-size:0.72rem; color:var(--color-muted);">Real-Time Mobile Automation Stream</span>
+        </div>
+        <div class="event-log-container" id="mobile-event-log" style="height:120px; font-family:var(--font-mono); font-size:0.72rem;">
+          <div class="event-item">
+            <span class="event-item__time">SYSTEM</span>
+            <span class="event-badge event-badge--sys">READY</span>
+            <span class="event-item__text">Mobile Comset Engine ready. Wireless ADB link active for automatic drone alert broadcasts.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </main>
 
   <!-- ═══════════ LIGHTBOX MODAL (VIDEO & SNAPSHOT VIEWER) ═══════════ -->
@@ -1398,7 +1581,12 @@
         if (targetEl) targetEl.classList.add('active');
 
         if (targetId === 'tab-analytics') {
-          setTimeout(initPlotlyCharts, 50);
+          setTimeout(() => {
+            initPlotlyCharts();
+          }, 60);
+          setTimeout(() => {
+            resizeAllPlotlyCharts();
+          }, 360);
         } else if (targetId === 'tab-reports' && !currentReportData) {
           generateReport();
         } else if (targetId === 'tab-gallery') {
@@ -1408,8 +1596,20 @@
         } else if (targetId === 'tab-rf-siren') {
           loadRFComsetStatus();
           loadSirenStatus();
+        } else if (targetId === 'tab-mobile-alert') {
+          loadMobileAlertStatus();
         }
       });
+    });
+
+    // Check URL parameters or hash to activate specific tab directly
+    window.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tabParam = urlParams.get('tab') || window.location.hash.replace('#', '');
+      if (tabParam) {
+        const btn = document.querySelector(`.tab-btn[data-tab="${tabParam}"]`);
+        if (btn) btn.click();
+      }
     });
 
     // ── Live Clock ──────────────────────────────────────────────
@@ -1578,6 +1778,9 @@
                   generateReport();
                 }, 1500);
               }
+            } else if (data.event === 'evidence_recorded') {
+              loadEvidenceVault();
+              showToast('🎬 Forensic Evidence Video Recorded: ' + (data.entry ? data.entry.filename : 'New Clip'));
             } else if (data.event === 'telemetry_clear') {
               clearLiveTelemetryAndRadar(true);
               const kpiTotal = document.getElementById('kpi-total');
@@ -2026,6 +2229,7 @@
     // ═════════════════════════════════════════════════════════════
 
     const plotlyLayoutBase = {
+      autosize: true,
       paper_bgcolor: 'rgba(0,0,0,0)',
       plot_bgcolor:  'rgba(0,0,0,0)',
       font: {
@@ -2033,13 +2237,15 @@
         color:  THEME.muted,
         size:   11
       },
-      margin: { l: 45, r: 25, t: 30, b: 40 },
+      margin: { l: 55, r: 35, t: 30, b: 50 },
       xaxis: {
+        automargin: true,
         gridcolor: 'rgba(243, 165, 173, 0.1)',
         tickcolor: 'rgba(243, 165, 173, 0.2)',
         color:     THEME.muted,
       },
       yaxis: {
+        automargin: true,
         gridcolor: 'rgba(243, 165, 173, 0.1)',
         tickcolor: 'rgba(243, 165, 173, 0.2)',
         color:     THEME.muted,
@@ -2057,12 +2263,50 @@
       }
     };
 
+    function resizeAllPlotlyCharts() {
+      const chartIds = [
+        'plotly-main-timeline',
+        'plotly-threat-composition',
+        'plotly-bearing-polar',
+        'plotly-hourly-heatmap',
+        'plotly-capability-radar'
+      ];
+      chartIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && typeof Plotly !== 'undefined') {
+          try {
+            Plotly.Plots.resize(el);
+          } catch (e) {}
+        }
+      });
+    }
+
+    window.addEventListener('resize', () => {
+      const tab = document.getElementById('tab-analytics');
+      if (tab && tab.classList.contains('active')) {
+        resizeAllPlotlyCharts();
+      }
+    });
+
+    if (window.ResizeObserver) {
+      const ro = new ResizeObserver(() => {
+        const tab = document.getElementById('tab-analytics');
+        if (tab && tab.classList.contains('active')) {
+          resizeAllPlotlyCharts();
+        }
+      });
+      const analyticsTab = document.getElementById('tab-analytics');
+      if (analyticsTab) ro.observe(analyticsTab);
+    }
+
     async function initPlotlyCharts() {
       await renderMainTimelineChart();
       await renderThreatCompositionChart();
       await renderBearingPolarChart();
       await renderHourlyHeatmapChart();
       renderCapabilityRadarChart();
+      setTimeout(resizeAllPlotlyCharts, 50);
+      setTimeout(resizeAllPlotlyCharts, 200);
     }
 
     // ── 1. Main Timeline Chart (Weekly / Monthly / Yearly) ──────
@@ -2214,6 +2458,7 @@
 
       const layout = {
         ...plotlyLayoutBase,
+        autosize: true,
         barmode: (activeScope === 'monthly' && activeCameraFilter === 'all') ? 'stack' : undefined,
         hovermode: 'x unified'
       };
@@ -2229,34 +2474,55 @@
       try {
         const r = await fetch(`/api/analytics/monthly?camera=${activeCameraFilter}`);
         const data = await r.json();
-        const comp = data.composition || { quadcopter: 0, fixed_wing: 0, fpv_micro: 0, unclassified: 0 };
-        const total = (comp.quadcopter || 0) + (comp.fixed_wing || 0) + (comp.fpv_micro || 0) + (comp.unclassified || 0);
+
+        let q = 0, f = 0, m = 0;
+        if (Array.isArray(data.quadcopter)) q = data.quadcopter.reduce((a, b) => a + b, 0);
+        else if (data.composition && data.composition.quadcopter) q = data.composition.quadcopter;
+
+        if (Array.isArray(data.fixed_wing)) f = data.fixed_wing.reduce((a, b) => a + b, 0);
+        else if (data.composition && data.composition.fixed_wing) f = data.composition.fixed_wing;
+
+        if (Array.isArray(data.fpv_micro)) m = data.fpv_micro.reduce((a, b) => a + b, 0);
+        else if (data.composition && data.composition.fpv_micro) m = data.composition.fpv_micro;
+
+        const total = q + f + m;
 
         let values, labels, colors;
         if (total === 0) {
           values = [1];
-          labels = ['No Incursions Recorded'];
-          colors = ['rgba(77, 35, 39, 0.4)'];
+          labels = ['No Incursions Recorded (Airspace Clear)'];
+          colors = ['rgba(77, 35, 39, 0.5)'];
         } else {
-          values = [comp.quadcopter || 0, comp.fixed_wing || 0, comp.fpv_micro || 0, comp.unclassified || 0];
-          labels = ['Quadcopter (DJI/Autel)', 'Fixed-Wing Scout', 'FPV Micro Drone', 'Unclassified'];
-          colors = [THEME.accent, THEME.secondary, THEME.primary, '#4D2327'];
+          values = [q, f, m];
+          labels = ['Quadcopter (DJI/Autel)', 'Fixed-Wing Scout', 'FPV Micro Drone'];
+          colors = [THEME.accent, THEME.secondary, THEME.primary];
         }
 
         const plotData = [{
           values: values,
           labels: labels,
           type: 'pie',
-          hole: 0.58,
+          hole: 0.55,
           marker: { colors: colors },
           textinfo: total === 0 ? 'label' : 'percent',
-          insidetextfont: { color: THEME.light, family: 'Poppins', size: 10 }
+          insidetextfont: { color: THEME.light, family: 'Poppins', size: 11 }
         }];
 
         const layout = {
           ...plotlyLayoutBase,
+          autosize: true,
           showlegend: total > 0,
-          margin: { l: 15, r: 15, t: 15, b: 15 }
+          legend: {
+            orientation: 'h',
+            x: 0.5,
+            xanchor: 'center',
+            y: -0.12,
+            font: { color: THEME.light, size: 10 },
+            bgcolor: 'rgba(26, 10, 11, 0.65)',
+            bordercolor: THEME.secondary,
+            borderwidth: 1
+          },
+          margin: { l: 20, r: 20, t: 25, b: 35 }
         };
 
         Plotly.newPlot(container, plotData, layout, { responsive: true, displayModeBar: false });
@@ -2273,7 +2539,7 @@
       try {
         const r = await fetch(`/api/analytics/monthly?camera=${activeCameraFilter}`);
         const data = await r.json();
-        const bearings = data.bearings || [0, 0, 0, 0, 0, 0, 0, 0];
+        const bearings = (data.bearings_distribution && data.bearings_distribution.counts) || data.bearings || [0, 0, 0, 0, 0, 0, 0, 0];
         const rValues = [...bearings, bearings[0]];
 
         const plotData = [{
@@ -2287,10 +2553,11 @@
         }];
 
         const layout = {
+          autosize: true,
           paper_bgcolor: 'rgba(0,0,0,0)',
           plot_bgcolor:  'rgba(0,0,0,0)',
           font: { family: 'Poppins', color: THEME.muted, size: 10 },
-          margin: { l: 30, r: 30, t: 25, b: 25 },
+          margin: { l: 40, r: 40, t: 30, b: 30 },
           polar: {
             bgcolor: 'rgba(26, 10, 11, 0.5)',
             radialaxis: {
@@ -2302,7 +2569,8 @@
             angularaxis: {
               gridcolor: 'rgba(243, 165, 173, 0.15)',
               color: THEME.muted,
-              direction: 'clockwise'
+              direction: 'clockwise',
+              period: 360
             }
           }
         };
@@ -2319,10 +2587,10 @@
       if (!container) return;
 
       try {
-        const hours = Array.from({length:24}, (_, i) => `${i.toString().padStart(2, '0')}:00`);
         const r = await fetch(`/api/analytics/monthly?camera=${activeCameraFilter}`);
         const data = await r.json();
-        const counts = data.hourly || Array(24).fill(0);
+        const hours = (data.hourly_breakdown && data.hourly_breakdown.hours) || Array.from({length:24}, (_, i) => `${i.toString().padStart(2, '0')}:00`);
+        const counts = (data.hourly_breakdown && data.hourly_breakdown.counts) || data.hourly || Array(24).fill(0);
 
         const colors = counts.map(v => v > 10 ? THEME.accent : (v > 3 ? THEME.secondary : 'rgba(154, 30, 35, 0.35)'));
 
@@ -2335,10 +2603,17 @@
 
         const layout = {
           ...plotlyLayoutBase,
+          autosize: true,
+          margin: { l: 45, r: 25, t: 25, b: 50 },
           xaxis: {
             ...plotlyLayoutBase.xaxis,
+            automargin: true,
             tickangle: -45,
             nticks: 12
+          },
+          yaxis: {
+            ...plotlyLayoutBase.yaxis,
+            automargin: true
           }
         };
 
@@ -2387,10 +2662,11 @@
       ];
 
       const layout = {
+        autosize: true,
         paper_bgcolor: 'rgba(0,0,0,0)',
         plot_bgcolor:  'rgba(0,0,0,0)',
-        font: { family: 'Poppins', color: THEME.muted, size: 9 },
-        margin: { l: 40, r: 40, t: 25, b: 25 },
+        font: { family: 'Poppins', color: THEME.muted, size: 10 },
+        margin: { l: 40, r: 40, t: 30, b: 45 },
         polar: {
           bgcolor: 'rgba(26, 10, 11, 0.5)',
           radialaxis: {
@@ -2405,8 +2681,10 @@
           }
         },
         legend: {
-          font: { color: THEME.muted, size: 9 },
+          font: { color: THEME.muted, size: 10 },
           orientation: 'h',
+          x: 0.5,
+          xanchor: 'center',
           y: -0.15
         }
       };
@@ -2415,14 +2693,16 @@
     }
 
     // ── Chart Filter Controls ───────────────────────────────────
-    function switchChartScope(scope, btn) {
+    async function switchChartScope(scope, btn) {
       activeScope = scope;
       btn.parentElement.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      renderMainTimelineChart();
+      await renderMainTimelineChart();
+      const timelineEl = document.getElementById('plotly-main-timeline');
+      if (timelineEl && typeof Plotly !== 'undefined') Plotly.Plots.resize(timelineEl);
     }
 
-    function filterCameraCharts(cam, btn) {
+    async function filterCameraCharts(cam, btn) {
       activeCameraFilter = 'primary';
       if (btn && btn.parentElement) {
         btn.parentElement.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
@@ -2430,12 +2710,14 @@
       }
 
       // Re-render all 5 charts with single camera filter
-      initPlotlyCharts();
+      await initPlotlyCharts();
+      resizeAllPlotlyCharts();
       showToast('Plotly analytics scoped to: Camera 01 (Optical HD)');
     }
 
-    function refreshAllPlotlyCharts() {
-      initPlotlyCharts();
+    async function refreshAllPlotlyCharts() {
+      await initPlotlyCharts();
+      resizeAllPlotlyCharts();
       showToast('All Plotly statistical models refreshed successfully!');
     }
 
@@ -3016,17 +3298,20 @@
       const mode = document.getElementById('cam-mode').value;
       const usbGroup = document.getElementById('usb-fields-group');
       const ptzGroup = document.getElementById('ptz-fields-group');
+      const ptzNetFields = document.getElementById('ptz-net-fields');
       const ipGroup = document.getElementById('ip-fields-group');
       const testBtn = document.getElementById('btn-test-camera');
 
       if (mode === 'usb') {
         if (usbGroup) usbGroup.style.display = 'block';
-        if (ptzGroup) ptzGroup.style.display = 'none';
+        if (ptzGroup) ptzGroup.style.display = 'block'; // Always display PTZ Joystick for USB
+        if (ptzNetFields) ptzNetFields.style.display = 'none'; // Hide IP/port fields for USB
         if (ipGroup) ipGroup.style.display = 'none';
         if (testBtn) testBtn.innerHTML = '<span>🔌</span> Test USB Camera Hardware';
       } else if (mode === 'ptz_onvif') {
         if (usbGroup) usbGroup.style.display = 'none';
         if (ptzGroup) ptzGroup.style.display = 'block';
+        if (ptzNetFields) ptzNetFields.style.display = 'grid'; // Show IP/port fields for ONVIF
         if (ipGroup) ipGroup.style.display = 'block';
         if (testBtn) testBtn.innerHTML = '<span>🔄</span> Test PTZ &amp; Motor Link';
       } else {
@@ -3055,9 +3340,12 @@
           const p = data.ptz;
           updatePTZUI(p);
 
-          // Dynamically synchronize live heading into compass visual and telemetry
+          // Dynamically synchronize live heading into compass visual, input field, and telemetry
           updateCompassVisual(p.live_heading_deg, p.live_cardinal);
           updateTelemetryDisplay({ azimuth_deg: p.live_heading_deg });
+
+          const camAzInput = document.getElementById('cam-azimuth');
+          if (camAzInput) camAzInput.value = p.live_heading_deg.toFixed(1);
 
           const actionLabel = direction.toUpperCase();
           showToast(`🔄 PTZ ${actionLabel}: Pan ${p.pan_deg > 0 ? '+' : ''}${p.pan_deg}° | Live Heading: ${p.live_heading_deg}° (${p.live_cardinal})`);
@@ -3068,6 +3356,24 @@
         showToast(`PTZ Move failed: ${err.message}`);
       }
     }
+
+    // Tactical Keyboard Arrow Shortcuts for PTZ Nudge
+    window.addEventListener('keydown', (e) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        ptzMove('left');
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        ptzMove('right');
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        ptzMove('up');
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        ptzMove('down');
+      }
+    });
 
     function updatePTZUI(p) {
       if (!p) return;
@@ -3280,9 +3586,11 @@
 
     async function testCameraProbe() {
       const mode = document.getElementById('cam-mode').value;
-      const ptzIp = document.getElementById('ptz-ip') ? document.getElementById('ptz-ip').value.trim() : '192.168.1.101';
-      const ip = mode === 'usb' ? (document.getElementById('cam-usb-index').value || '0') : (mode === 'ptz_onvif' ? ptzIp : document.getElementById('cam-ip').value.trim());
-      const port = mode === 'ptz_onvif' ? (parseInt(document.getElementById('ptz-port')?.value) || 80) : (parseInt(document.getElementById('cam-port').value) || 554);
+      const camIpInput = (document.getElementById('cam-ip')?.value || '').trim();
+      const ptzIpInput = (document.getElementById('ptz-ip')?.value || '').trim();
+      const ip = mode === 'usb' ? (document.getElementById('cam-usb-index').value || '0') : (camIpInput || ptzIpInput || '192.168.1.101');
+      // For video reachability test, always probe the RTSP stream port (554)
+      const port = mode === 'usb' ? 554 : (parseInt(document.getElementById('cam-port')?.value) || 554);
       const alertBox = document.getElementById('probe-alert');
       const alertMsg = document.getElementById('probe-alert-msg');
       const alertIcon = document.getElementById('probe-alert-icon');
@@ -3294,7 +3602,7 @@
       alertIcon.textContent = '⏳';
       alertMsg.textContent = mode === 'usb' 
         ? `Verifying USB Camera device at Index ${ip}...` 
-        : (mode === 'ptz_onvif' ? `Pinging PTZ ONVIF motor & video stream at ${ip}:${port}...` : `Probing ${ip}:${port} on local network...`);
+        : (mode === 'ptz_onvif' ? `Testing video stream at ${ip}:${port} (RTSP) and PTZ motor at port 80 (ONVIF)...` : `Probing ${ip}:${port} on local network...`);
 
       try {
         const res = await fetch('/api/camera/test', {
@@ -3326,10 +3634,13 @@
     async function saveCameraConfiguration() {
       const mode = document.getElementById('cam-mode').value;
       const usbIdx = document.getElementById('cam-usb-index') ? document.getElementById('cam-usb-index').value : '0';
-      const ptzIp = document.getElementById('ptz-ip') ? document.getElementById('ptz-ip').value.trim() : '192.168.1.101';
-      const ipVal = mode === 'usb' ? usbIdx : (mode === 'ptz_onvif' ? ptzIp : (document.getElementById('cam-ip').value.trim() || '192.168.1.101'));
-      const portVal = mode === 'usb' ? 554 : (mode === 'ptz_onvif' ? (parseInt(document.getElementById('ptz-port')?.value) || 80) : (parseInt(document.getElementById('cam-port').value) || 554));
-      const pathVal = mode === 'usb' ? '' : document.getElementById('cam-path').value.trim();
+      const camIp = (document.getElementById('cam-ip')?.value || '').trim();
+      const ptzIp = (document.getElementById('ptz-ip')?.value || '').trim();
+      const ipVal = mode === 'usb' ? usbIdx : (camIp || ptzIp || '192.168.1.101');
+      // Crucial fix: RTSP video stream uses cam-port (554), PTZ motor controls use ptz-port (80)
+      const rtspPortVal = parseInt(document.getElementById('cam-port')?.value) || 554;
+      const ptzPortVal = parseInt(document.getElementById('ptz-port')?.value) || 80;
+      const pathVal = mode === 'usb' ? '' : (document.getElementById('cam-path')?.value.trim() || '/stream1');
 
       const azVal = ((parseFloat(document.getElementById('cam-azimuth').value) || 90.0) % 360 + 360) % 360;
       const fovVal = parseFloat(document.getElementById('cam-fov').value) || 90.0;
@@ -3341,11 +3652,12 @@
         name: document.getElementById('cam-name').value.trim() || 'Primary Defense Camera',
         connection_mode: mode,
         ip: ipVal,
-        port: portVal,
+        port: rtspPortVal, // Always 554 for RTSP streaming
+        rtsp_port: rtspPortVal,
         rtsp_path: pathVal,
         username: document.getElementById('cam-user').value.trim(),
         password: document.getElementById('cam-pass').value.trim(),
-        city: document.getElementById('cam-city').value.trim() || 'Islamabad',
+        city: document.getElementById('cam-city').value.trim() || 'HariPur',
         latitude: latVal,
         longitude: lonVal,
         azimuth_deg: azVal,
@@ -3356,9 +3668,9 @@
       };
 
       if (mode === 'ptz_onvif') {
-        payload.ptz_ip = ptzIp;
+        payload.ptz_ip = ipVal;
         payload.ptz_protocol = document.getElementById('ptz-protocol') ? document.getElementById('ptz-protocol').value : 'onvif';
-        payload.ptz_port = parseInt(document.getElementById('ptz-port')?.value) || 80;
+        payload.ptz_port = ptzPortVal; // Port 80 for ONVIF motor controls
         payload.ptz_speed = parseFloat(document.getElementById('ptz-speed')?.value) || 1.0;
       }
 
@@ -3410,17 +3722,10 @@
           const cardName = getCardinalDirection(azVal);
           showToast(`✅ Saved! Camera set to facing ${cardName} (${azVal.toFixed(1)}°). Live feed refreshed.`);
 
-          // Refresh live feed preview
-          const previewImg = document.getElementById('setup-preview-img');
-          if (previewImg) {
-            previewImg.src = `/api/video_feed/${activeCameraId}?t=${Date.now()}`;
-          }
-
-          // Also reload main feed image if on live tab
-          const mainFeed = document.querySelector(activeCameraId === 'primary' ? '#cam-card-1 img' : '#cam-card-2 img');
-          if (mainFeed) {
-            mainFeed.src = `/api/video_feed/${activeCameraId}?t=${Date.now()}`;
-          }
+          // Refresh all live feed preview and main tab images
+          document.querySelectorAll('.camera-stream-img, #setup-preview-img').forEach(img => {
+            img.src = `/api/video_feed/${activeCameraId}?t=${Date.now()}`;
+          });
         } else {
           showToast(`Save failed: ${data.error || 'Server error'}`);
         }
@@ -3464,6 +3769,184 @@
       );
     }
 
+    // ═════════════════════════════════════════════════════════════
+    // MOBILE TACTICAL ALERT & WIRELESS ADB CONTROLLER
+    // ═════════════════════════════════════════════════════════════
+    async function loadMobileAlertStatus() {
+      try {
+        const res = await fetch('/api/mobile/status');
+        const data = await res.json();
+        renderMobileUI(data);
+      } catch (err) {
+        console.error('Failed to load mobile status:', err);
+      }
+    }
+
+    function renderMobileUI(m) {
+      if (!m) return;
+      const statusText = document.getElementById('mobile-status-text');
+      const connBadge = document.getElementById('mobile-conn-badge');
+      const modelPill = document.getElementById('mobile-model-pill');
+      const directLink = document.getElementById('mobile-direct-link-text');
+      const alertUrlInput = document.getElementById('mobile-alert-url');
+
+      if (m.alert_url) {
+        if (directLink) directLink.textContent = m.alert_url;
+        if (alertUrlInput) alertUrlInput.value = m.alert_url;
+      }
+      if (m.connected) {
+        if (modelPill) {
+          modelPill.textContent = m.device_model;
+          modelPill.style.color = 'var(--status-ok)';
+        }
+        if (statusText) statusText.textContent = `${m.device_model} Connected Wirelessly (${m.target})`;
+        if (connBadge) {
+          connBadge.innerHTML = `<span class="status-indicator-tag status-indicator-tag--online"><span class="status-dot"></span> LINK ACTIVE</span>`;
+        }
+      } else {
+        if (modelPill) {
+          modelPill.textContent = m.device_model && m.device_model !== 'Android Device' ? `${m.device_model} (Offline)` : 'No Device Linked';
+          modelPill.style.color = 'var(--color-muted)';
+        }
+        if (statusText) statusText.textContent = `Disconnected — Ready for Wireless Pairing`;
+        if (connBadge) {
+          connBadge.innerHTML = `<span class="status-indicator-tag" style="background:rgba(239,68,68,0.2);color:#f87171;border:1px solid #ef4444;"><span class="status-dot" style="background:#ef4444;"></span> OFFLINE</span>`;
+        }
+      }
+    }
+
+    async function pairMobileDevice() {
+      const pairAddr = document.getElementById('mobile-ip-port').value.trim();
+      const pairCode = document.getElementById('mobile-pair-code').value.trim();
+      const connPort = document.getElementById('mobile-conn-port').value.trim();
+      const banner = document.getElementById('mobile-pair-banner');
+
+      if (!pairAddr || !pairCode) {
+        showToast('Please enter both Device IP:Port and 6-Digit Pairing Code!');
+        return;
+      }
+
+      showToast('Pairing with Android phone wirelessly...');
+      if (banner) {
+        banner.style.display = 'block';
+        banner.style.background = 'rgba(56, 189, 248, 0.15)';
+        banner.style.border = '1px solid #38bdf8';
+        banner.style.color = '#38bdf8';
+        banner.innerHTML = '⏳ Pairing device over Wi-Fi... Please wait.';
+      }
+
+      try {
+        const res = await fetch('/api/mobile/pair', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pair_addr: pairAddr, pair_code: pairCode, conn_port: connPort })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          showToast('✅ ' + data.message);
+          if (banner) {
+            banner.style.background = 'rgba(34, 197, 94, 0.15)';
+            banner.style.border = '1px solid #22c55e';
+            banner.style.color = '#4ade80';
+            banner.innerHTML = `✅ ${data.message}`;
+          }
+          logMobileEvent('PAIRED', data.message);
+          loadMobileAlertStatus();
+        } else {
+          showToast('❌ ' + data.message);
+          if (banner) {
+            banner.style.background = 'rgba(239, 68, 68, 0.15)';
+            banner.style.border = '1px solid #ef4444';
+            banner.style.color = '#f87171';
+            banner.innerHTML = `❌ ${data.message}`;
+          }
+          logMobileEvent('ERROR', data.message);
+        }
+      } catch (err) {
+        showToast('Pairing request failed: ' + err.message);
+        if (banner) {
+          banner.style.background = 'rgba(239, 68, 68, 0.15)';
+          banner.style.border = '1px solid #ef4444';
+          banner.style.color = '#f87171';
+          banner.innerHTML = `❌ Request error: ${err.message}`;
+        }
+      }
+    }
+
+    async function launchAlertOnMobile() {
+      showToast('Launching Chrome with Alert Screen on mobile...');
+      try {
+        const res = await fetch('/api/mobile/launch', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          showToast('🚀 ' + data.message);
+          logMobileEvent('LAUNCH', data.message);
+        } else {
+          showToast('❌ ' + data.message);
+          logMobileEvent('WARN', data.message);
+        }
+      } catch (err) {
+        showToast('Launch failed: ' + err.message);
+      }
+    }
+
+    async function disconnectMobileDevice() {
+      try {
+        await fetch('/api/mobile/disconnect', { method: 'POST' });
+        showToast('Device disconnected.');
+        loadMobileAlertStatus();
+        logMobileEvent('DISCONNECT', 'Wireless connection closed.');
+      } catch (e) {}
+    }
+
+    async function testMobileUrduAlert() {
+      showToast('🚨 Triggering 15-second Urdu IED Alert on Mobile...');
+      try {
+        const res = await fetch('/api/alert/trigger', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            threat_level: 'CRITICAL',
+            drone_type: 'DRONE IED (TACTICAL TEST)'
+          })
+        });
+        const data = await res.json();
+        logMobileEvent('ALERT', '15-second Urdu IED Voice Alert broadcasted to all mobile screens.');
+      } catch (err) {
+        showToast('Trigger failed: ' + err.message);
+      }
+    }
+
+    async function dismissMobileAlert() {
+      try {
+        await fetch('/api/alert/dismiss', { method: 'POST' });
+        showToast('Alert silenced on all devices.');
+        logMobileEvent('SILENCE', 'Alert dismissed.');
+      } catch (e) {}
+    }
+
+    function copyMobileLink() {
+      const txt = document.getElementById('mobile-direct-link-text').textContent;
+      navigator.clipboard.writeText(txt).then(() => {
+        showToast('📋 Mobile alert link copied to clipboard!');
+      });
+    }
+
+    function logMobileEvent(badge, text) {
+      const container = document.getElementById('mobile-event-log');
+      if (!container) return;
+      const time = new Date().toLocaleTimeString();
+      const item = document.createElement('div');
+      item.className = 'event-item';
+      item.innerHTML = `
+        <span class="event-item__time">${time}</span>
+        <span class="event-badge event-badge--sys">${badge}</span>
+        <span class="event-item__text">${text}</span>
+      `;
+      container.prepend(item);
+    }
+
     // Initial load on startup
     window.addEventListener('DOMContentLoaded', () => {
       loadOverviewKPIs();
@@ -3471,8 +3954,12 @@
       loadCameraConfig();
       loadRFComsetStatus();
       loadSirenStatus();
+      loadMobileAlertStatus();
       loadEvidenceVault();
-      initPlotlyCharts();
+      const tabAnalytics = document.getElementById('tab-analytics');
+      if (tabAnalytics && tabAnalytics.classList.contains('active')) {
+        initPlotlyCharts();
+      }
     });
   </script>
 </body>

@@ -124,11 +124,11 @@ class LiveDroneInferenceEngine:
         self._last_push_time: Dict[str, float] = {}
         self._locked_announced: Dict[str, bool] = {}
 
-        # Event-triggered Forensic Evidence Video Recording (strictly 1 clip per session)
+        # Event-triggered Forensic Evidence Video Recording (2s pre-buffer + tracking until disappearance)
         from collections import deque
         from logging_system.evidence_recorder import get_evidence_recorder
         self.evidence_recorder = get_evidence_recorder()
-        self._frame_buffer = deque(maxlen=75)
+        self._frame_buffer = deque(maxlen=60)
         self._last_evidence_time = 0.0
 
         # Asynchronous High-FPS Inference Pipeline
@@ -380,8 +380,7 @@ class LiveDroneInferenceEngine:
                     if first_lock:
                         self._locked_announced[tgt_id_str] = True
 
-                        from logging_system.evidence_recorder import EvidenceRecorder
-                        if not EvidenceRecorder._session_recorded:
+                        if not self.evidence_recorder.is_recording():
                             with self._lock:
                                 buffered_snap = list(self._frame_buffer)
                             det_snap = list(active_targets)
@@ -390,24 +389,28 @@ class LiveDroneInferenceEngine:
                             gps_snap = (self.cam_lat, self.cam_lon)
                             frame_snap = frame.copy()
 
-                            def _record_task():
+                            def _start_evid_task():
                                 try:
-                                    logger.warning("🎬 Drone target %s confirmed: Recording single forensic MP4 evidence clip...", tgt_id_str)
-                                    self.evidence_recorder.record_evidence_clip(
-                                        base_frame=frame_snap,
-                                        detections=det_snap,
+                                    logger.warning("🎬 Drone target %s confirmed: Starting continuous incursion evidence recording...", tgt_id_str)
+                                    self.evidence_recorder.start_incursion(
+                                        pre_frames=buffered_snap,
                                         camera_id=c_id_snap,
                                         bearing_deg=brg_snap,
                                         gps_coords=gps_snap,
                                         city="Sector Alpha",
-                                        duration_sec=5.0,
-                                        fps=20,
-                                        frames=buffered_snap if len(buffered_snap) >= 15 else None
+                                        base_frame=frame_snap,
+                                        target_id=tgt_id_str,
+                                        drone_type="Commercial Drone (Quadcopter)",
+                                        fps=20.0
                                     )
                                 except Exception as ev_err:
-                                    logger.error("Failed to record evidence clip: %s", ev_err)
+                                    logger.error("Failed to start continuous evidence recording: %s", ev_err)
 
-                            threading.Thread(target=_record_task, daemon=True, name=f"evid-{tgt_id_str}").start()
+                            threading.Thread(target=_start_evid_task, daemon=True, name=f"evid-{tgt_id_str}").start()
+                        else:
+                            self.evidence_recorder.on_target_present()
+                    elif is_locked:
+                        self.evidence_recorder.on_target_present()
 
                     if first_lock or (now_t - last_push) >= 0.14:
                         self._last_push_time[tgt_id_str] = now_t
@@ -446,6 +449,23 @@ class LiveDroneInferenceEngine:
                                 self._telemetry_callback(payload)
                             except Exception as cb_err:
                                 logger.debug("Telemetry callback error: %s", cb_err)
+
+            # If no confirmed target locked in this inference cycle, check if drone has disappeared
+            has_any_locked = any(
+                (target_states.get(getattr(d, "track_id")) and target_states.get(getattr(d, "track_id")).state in (TargetThreatState.CONFIRMED, TargetThreatState.COOLDOWN))
+                for d in active_targets
+            ) if active_targets else False
+
+            if not has_any_locked and self.evidence_recorder.is_recording():
+                ev_entry = self.evidence_recorder.check_disappearance(grace_period=2.5)
+                if ev_entry and self._telemetry_callback is not None:
+                    try:
+                        self._telemetry_callback({
+                            "event": "evidence_recorded",
+                            "entry": ev_entry
+                        })
+                    except Exception as cb_err:
+                        logger.debug("Evidence callback error: %s", cb_err)
 
             with self._render_targets_lock:
                 self._cached_render_targets = rendered_list
@@ -526,6 +546,10 @@ class LiveDroneInferenceEngine:
         fps_val = self._stream_fps if self._stream_fps > 0 else 25.0
         fps_text = f"STREAM: {fps_val:.1f} FPS (HIGH SPEED) | AI WORKER: {self._last_infer_ms:.0f}ms | TARGETS: {len(active_render)}"
         cv2.putText(out_frame, fps_text, (14, h - 14), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (160, 160, 190), 1, cv2.LINE_AA)
+
+        # Feed frame to active incursion evidence video recording
+        if self.evidence_recorder.is_recording():
+            self.evidence_recorder.write_frame(out_frame, has_targets=len(active_render) > 0)
 
         return out_frame
 

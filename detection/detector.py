@@ -28,7 +28,7 @@ from typing import List, Optional
 
 import numpy as np
 
-from logging_system.evidence_recorder import EvidenceRecorder
+from logging_system.evidence_recorder import EvidenceRecorder, get_evidence_recorder
 from detection.decision_engine import DecisionEngine, DecisionResult
 from detection.sahi_engine import SahiTTAEngine
 
@@ -154,7 +154,7 @@ class DroneDetector:
         self._alert_manager  = alert_manager
         self._event_logger   = event_logger
         self._snapshot_saver = snapshot_saver
-        self._evidence_recorder = evidence_recorder or EvidenceRecorder()
+        self._evidence_recorder = evidence_recorder or get_evidence_recorder()
         self._decision_engine   = decision_engine or DecisionEngine()
 
         self._drone_classes: Optional[List[int]] = self._cfg.get("drone_classes")

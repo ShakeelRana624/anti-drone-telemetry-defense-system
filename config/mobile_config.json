@@ -1,0 +1,9 @@
+{
+  "enabled": true,
+  "ip": "192.168.137.18",
+  "pair_port": 39527,
+  "conn_port": 38171,
+  "device_model": "Infinix X657B",
+  "auto_launch_on_alert": true,
+  "alert_url": "http://192.168.137.1:5000/alert"
+}

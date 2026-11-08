@@ -104,6 +104,7 @@ class AlertManager:
             threading.Thread(target=self._fire_gsm,      args=(context,), daemon=True),
             threading.Thread(target=self._fire_landline, daemon=True),
             threading.Thread(target=self._fire_rf,       args=(context,), daemon=True),
+            threading.Thread(target=self._fire_mobile,   args=(context,), daemon=True),
             threading.Thread(target=self._push_dashboard,args=(context, detections), daemon=True),
         ]
         for t in threads:
@@ -155,6 +156,14 @@ class AlertManager:
             self.rf.transmit(context)
         except Exception as exc:
             logger.error("RF comset failed: %s", exc)
+
+    def _fire_mobile(self, context: dict) -> None:
+        """Wake up connected Android phone and display live tactical alert screen with Urdu voice."""
+        try:
+            from alerting.mobile_comset import MobileComset
+            MobileComset.get_instance().on_drone_detected(context)
+        except Exception as exc:
+            logger.error("Mobile alert dispatch failed: %s", exc)
 
     def _push_dashboard(self, context: dict, detections: List) -> None:
         """

@@ -98,11 +98,11 @@ def process_video_file(
     input_path: Path,
     output_path: Optional[Path] = None,
     model_path: str = "model/best.onnx",
-    conf_thresh: float = 0.35,
+    conf_thresh: float = 0.20,
     slice_size: int = 256,
-    camera_heading: float = 90.0,
-    cam_lat: float = 33.6844,
-    cam_lon: float = 73.0479,
+    camera_heading: float = 135,
+    cam_lat: float = 34.0524840,
+    cam_lon: float = 71.9862600,
     drone_type: str = "generic_medium",
     drone_width_m: Optional[float] = None,
 ) -> None:
@@ -247,7 +247,7 @@ def process_video_file(
     # SAHI + TTA Engine for high resolution
     sahi_engine = SahiTTAEngine(
         slice_size=slice_size,
-        overlap_ratio=0.25,
+        overlap_ratio=0.30,
         iou_threshold=0.45,
         use_tta=True,
     )
@@ -653,14 +653,14 @@ def main():
     parser.add_argument(
         "--cam-lat",
         type=float,
-        default=33.6844,
-        help="Camera GPS Latitude (WGS-84). Default: 33.6844 (Islamabad)",
+        default=34.0524840,
+        help="Camera GPS Latitude (WGS-84). Default: 34.0524840",
     )
     parser.add_argument(
         "--cam-lon",
         type=float,
-        default=73.0479,
-        help="Camera GPS Longitude (WGS-84). Default: 73.0479 (Islamabad)",
+        default=71.9862600,
+        help="Camera GPS Longitude (WGS-84). Default: 71.9862600",
     )
     parser.add_argument(
         "--drone-type",
@@ -678,8 +678,8 @@ def main():
     parser.add_argument(
         "--slice-size",
         type=int,
-        default=256,
-        help="SAHI slice size for high-resolution processing (default: 256)",
+        default=640,
+        help="SAHI slice size for high-resolution processing (default: 640)",
     )
     args = parser.parse_args()
 

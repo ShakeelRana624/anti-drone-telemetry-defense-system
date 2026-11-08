@@ -56,6 +56,12 @@ logs/events/*
 .env.*
 config/secrets.yaml
 
+# Reports (Confidential / Local-only deliverables)
+TRAINING_AND_SYSTEM_REPORT.md
+*.docx
+reports/
+results/
+
 # OS & Editor Specific Files
 .DS_Store
 Thumbs.db

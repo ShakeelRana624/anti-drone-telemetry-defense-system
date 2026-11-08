@@ -119,7 +119,7 @@ class SahiTTAEngine:
         self,
         model: Any,
         frame: np.ndarray,
-        conf_threshold: float = 0.35,
+        conf_threshold: float = 0.20,
         drone_classes: Optional[List[int]] = None,
     ) -> List[Any]:
         """
@@ -194,7 +194,7 @@ class SahiTTAEngine:
                     source=crop_img,
                     conf=conf_threshold,
                     iou=self.iou_threshold,
-                    imgsz=self.slice_size,
+                    imgsz=640,
                     verbose=False,
                 )
             except Exception as exc:

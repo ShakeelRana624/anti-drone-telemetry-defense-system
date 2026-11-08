@@ -40,6 +40,7 @@ DEFAULT_CAMERAS = {
         "fps": 25,
         "resolution": [1280, 720],
         "enabled": True,
+        "configured": False,
         "notes": "Main optical zoom covering northern airspace perimeter."
     },
     "secondary": {
@@ -61,6 +62,7 @@ DEFAULT_CAMERAS = {
         "fps": 25,
         "resolution": [1280, 720],
         "enabled": True,
+        "configured": False,
         "notes": "Long-wave FLIR thermal camera covering eastern vector."
     }
 }

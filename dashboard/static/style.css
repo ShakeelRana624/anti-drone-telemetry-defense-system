@@ -967,6 +967,13 @@ img {
 }
 
 /* ── Plotly Charts Section ───────────────────────────────────── */
+#tab-analytics {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
 .analytics-controls-bar {
   display: flex;
   align-items: center;
@@ -978,12 +985,16 @@ img {
   background: var(--color-dark-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .filter-group {
   display: flex;
   align-items: center;
   gap: 0.6rem;
+  flex-wrap: wrap;
 }
 
 .filter-label {
@@ -999,6 +1010,8 @@ img {
   padding: 0.25rem;
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border);
+  flex-wrap: wrap;
+  gap: 0.25rem;
 }
 
 .pill-btn {
@@ -1007,6 +1020,9 @@ img {
   font-weight: 600;
   border-radius: var(--radius-xl);
   color: var(--color-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
 .pill-btn.active {
@@ -1017,14 +1033,18 @@ img {
 
 .charts-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.4rem;
   margin-bottom: 1.5rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 @media (max-width: 1024px) {
   .charts-grid {
     grid-template-columns: 1fr;
+    gap: 1.25rem;
   }
 }
 
@@ -1032,13 +1052,19 @@ img {
   background: var(--color-dark-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: 1.25rem;
+  padding: 1.25rem 1.4rem;
   box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  position: relative;
 }
 
 .chart-card--full {
+  width: 100%;
   grid-column: 1 / -1;
 }
 
@@ -1046,13 +1072,18 @@ img {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
   margin-bottom: 0.85rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .chart-card__title {
   font-size: 0.95rem;
   font-weight: 700;
   color: var(--color-light);
+  word-break: break-word;
 }
 
 .chart-card__subtitle {
@@ -1062,8 +1093,51 @@ img {
 
 .chart-container {
   width: 100%;
-  min-height: 340px;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 380px;
+  height: 380px;
   position: relative;
+  box-sizing: border-box;
+}
+
+.chart-card--full .chart-container,
+#plotly-main-timeline {
+  min-height: 440px;
+  height: 440px;
+}
+
+@media (max-width: 768px) {
+  .analytics-controls-bar {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.85rem;
+    gap: 0.75rem;
+  }
+  .filter-group {
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+  }
+  .pill-group {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .pill-btn {
+    flex: 1;
+    text-align: center;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.72rem;
+  }
+  .chart-card {
+    padding: 0.85rem;
+  }
+  .chart-container {
+    min-height: 300px;
+  }
+  .chart-card--full .chart-container {
+    min-height: 320px;
+  }
 }
 
 /* ── Reports Generation Section ──────────────────────────────── */

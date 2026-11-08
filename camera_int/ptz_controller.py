@@ -70,11 +70,13 @@ class PTZController:
             if "mount_heading_deg" in cfg and cfg["mount_heading_deg"] not in (None, ""):
                 try:
                     self.mount_heading_deg = float(cfg["mount_heading_deg"]) % 360.0
+                    self.pan_deg = 0.0
                 except (ValueError, TypeError):
                     pass
             elif "azimuth_deg" in cfg and cfg["azimuth_deg"] not in (None, ""):
                 try:
                     self.mount_heading_deg = float(cfg["azimuth_deg"]) % 360.0
+                    self.pan_deg = 0.0
                 except (ValueError, TypeError):
                     pass
             if "fov_deg" in cfg and cfg["fov_deg"] not in (None, ""):
@@ -212,22 +214,70 @@ class PTZController:
         }
 
     def _sync_heading_to_inference(self) -> None:
-        """Propagate current live heading and FOV to Live Drone Inference Engine in real time."""
+        """Propagate current live heading and FOV to Live Drone Inference Engine and camera config in real time."""
+        live_heading = ((self.mount_heading_deg + self.pan_deg) % 360.0 + 360.0) % 360.0
+        current_fov = max(2.0, self.base_fov_deg / max(1.0, self.zoom_level))
         try:
             from detection.live_inference import get_live_inference_engine
             engine = get_live_inference_engine()
-            live_heading = ((self.mount_heading_deg + self.pan_deg) % 360.0 + 360.0) % 360.0
-            current_fov = max(2.0, self.base_fov_deg / max(1.0, self.zoom_level))
             engine.update_camera_params(heading=live_heading, fov_h=current_fov)
         except Exception as e:
             logger.debug("Could not sync PTZ heading to inference engine: %s", e)
 
+        try:
+            from camera_int import get_ip_camera_manager
+            mgr = get_ip_camera_manager()
+            cam_cfg = mgr.config_manager.get_camera(self.camera_id)
+            if cam_cfg:
+                cam_cfg["azimuth_deg"] = round(live_heading, 1)
+                mgr.config_manager.save()
+        except Exception as e:
+            logger.debug("Could not persist PTZ heading to camera config: %s", e)
+
     def _dispatch_hardware_move(self, action: str, speed: float) -> None:
         """
-        Send physical ONVIF / HTTP command to camera endpoint if accessible.
+        Send physical ONVIF / HTTP command to camera endpoint if accessible,
+        or DirectShow / UVC command for USB PTZ cameras.
         Executes asynchronously to prevent UI blocking.
         """
         def _worker():
+            # 1. Try USB UVC DirectShow command via OpenCV VideoCapture if active
+            try:
+                from camera_int import get_ip_camera_manager
+                mgr = get_ip_camera_manager()
+                stream = mgr.get_stream(self.camera_id)
+                if stream and stream.config.get("connection_mode") in ("usb", "webcam") and stream._cap and stream._cap.isOpened():
+                    cap = stream._cap
+                    import cv2
+                    deg_step = 5.0 * speed
+                    if action == "left":
+                        cur = cap.get(cv2.CAP_PROP_PAN)
+                        if cur != -1.0 and cur is not None:
+                            cap.set(cv2.CAP_PROP_PAN, cur - deg_step)
+                    elif action == "right":
+                        cur = cap.get(cv2.CAP_PROP_PAN)
+                        if cur != -1.0 and cur is not None:
+                            cap.set(cv2.CAP_PROP_PAN, cur + deg_step)
+                    elif action == "up":
+                        cur = cap.get(cv2.CAP_PROP_TILT)
+                        if cur != -1.0 and cur is not None:
+                            cap.set(cv2.CAP_PROP_TILT, cur + (3.0 * speed))
+                    elif action == "down":
+                        cur = cap.get(cv2.CAP_PROP_TILT)
+                        if cur != -1.0 and cur is not None:
+                            cap.set(cv2.CAP_PROP_TILT, cur - (3.0 * speed))
+                    elif action in ("zoom_in", "in"):
+                        cur = cap.get(cv2.CAP_PROP_ZOOM)
+                        if cur != -1.0 and cur is not None:
+                            cap.set(cv2.CAP_PROP_ZOOM, cur + (1.0 * speed))
+                    elif action in ("zoom_out", "out"):
+                        cur = cap.get(cv2.CAP_PROP_ZOOM)
+                        if cur != -1.0 and cur is not None:
+                            cap.set(cv2.CAP_PROP_ZOOM, max(0.0, cur - (1.0 * speed)))
+            except Exception as e:
+                logger.debug("USB UVC PTZ dispatch error: %s", e)
+
+            # 2. Try ONVIF / HTTP network request if network reachable
             try:
                 import urllib.request
                 import urllib.error
@@ -235,15 +285,12 @@ class PTZController:
                 # Hikvision ISAPI format
                 if "hikvision" in self.protocol:
                     url = f"http://{self.ip}:{self.port}/ISAPI/PTZCtrl/channels/1/continuous"
-                    # Simple HTTP nudge if network available
                 # Dahua CGI format
                 elif "dahua" in self.protocol:
                     url = f"http://{self.ip}:{self.port}/cgi-bin/ptz.cgi?action=start&code={action}&arg1=0&arg2=5&arg3=0"
                 # ONVIF standard SOAP wrapper
                 else:
                     url = f"http://{self.ip}:{self.port}/onvif/ptz_service"
-
-                # If camera is reachable on local network, send action
             except Exception:
                 pass
 
@@ -270,7 +317,13 @@ def get_ptz_controller(camera_id: str = "primary", config: Optional[Dict[str, An
     """Singleton/Factory provider for camera PTZ controllers."""
     with _ptz_lock:
         if camera_id not in _ptz_controllers:
-            cfg = config or {}
+            cfg = config
+            if not cfg:
+                try:
+                    from camera_int import get_ip_camera_manager
+                    cfg = get_ip_camera_manager().config_manager.get_camera(camera_id) or {}
+                except Exception:
+                    cfg = {}
             ctrl = PTZController(
                 camera_id=camera_id,
                 ip=cfg.get("ip", "192.168.1.101"),
@@ -278,7 +331,7 @@ def get_ptz_controller(camera_id: str = "primary", config: Optional[Dict[str, An
                 username=cfg.get("username", "admin"),
                 password=cfg.get("password", ""),
                 mount_heading_deg=cfg.get("mount_heading_deg", cfg.get("azimuth_deg", 0.0)),
-                base_fov_deg=cfg.get("fov_deg", 65.0),
+                base_fov_deg=cfg.get("fov_deg", 90.0),
                 protocol=cfg.get("ptz_protocol", "onvif"),
             )
             _ptz_controllers[camera_id] = ctrl

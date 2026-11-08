@@ -80,6 +80,28 @@ class IPCameraManager:
         temp_stream.start()
         return temp_stream.read()
 
+    def get_frame_with_status(self, camera_id: str) -> Tuple[np.ndarray, bool]:
+        """
+        Get latest frame for specified camera along with a boolean indicating
+        whether the frame is an actual live hardware stream (True) or synthetic standby (False).
+
+        Args:
+            camera_id: Camera stream identifier ('primary', 'secondary').
+
+        Returns:
+            Tuple[numpy.ndarray, bool]: (BGR frame, is_live_hardware_flag).
+        """
+        stream = self._streams.get(camera_id)
+        if stream:
+            is_real = bool(stream.healthy and stream._frame is not None and stream.config.get("configured", False))
+            return stream.read(), is_real
+
+        cam_cfg = self.config_manager.get_camera(camera_id) or {"id": camera_id}
+        temp_stream = IPCameraStream(cam_cfg)
+        self._streams[camera_id] = temp_stream
+        temp_stream.start()
+        return temp_stream.read(), False
+
     def get_camera_statuses(self) -> Dict[str, Any]:
         """
         Return full camera metadata, connection states, FPS, and latencies for Web UI dashboard.
@@ -108,7 +130,7 @@ class IPCameraManager:
                 "is_online": healthy,
                 "current_fps": fps,
                 "latency_ms": latency,
-                "status_label": "CONNECTED" if healthy else "SIMULATION / STANDBY",
+                "status_label": "CONNECTED" if healthy else ("STANDBY" if cfg.get("configured", False) else "UNCONFIGURED"),
                 "ptz": ptz_data,
             }
         return statuses
@@ -187,6 +209,8 @@ class IPCameraManager:
             else:
                 ip = updated.get("ip", "")
                 port = updated.get("port", 554)
+                if mode in ("ptz_onvif", "ip_rtsp") and port == 80:
+                    port = updated.get("rtsp_port", 554)
                 path = updated.get("rtsp_path", "/stream1")
                 user = updated.get("username", "")
                 pwd = updated.get("password", "")

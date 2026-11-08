@@ -6,6 +6,13 @@ color 0A
 :: Ensure working directory is the script's root directory
 cd /d "%~dp0"
 
+:: 0. Register Portable ADB and Local Bin Tools into PATH
+if exist "%~dp0bin\platform-tools" (
+    set "PATH=%~dp0bin\platform-tools;%~dp0bin;%PATH%"
+) else if exist "%~dp0bin" (
+    set "PATH=%~dp0bin;%PATH%"
+)
+
 echo ===============================================================================
 echo            LIMONS ANTI-DRONE TELEMETRY DEFENSE SYSTEM
 echo                    Autonomous Surveillance Suite
@@ -35,6 +42,16 @@ exit /b 1
 :python_ok
 for /f "tokens=*" %%v in ('python --version 2^>^&1') do set PY_VER=%%v
 echo [OK] Detected %PY_VER%
+
+:: Check ADB accessibility (Portable or System)
+adb version >nul 2>&1
+if not errorlevel 1 (
+    for /f "tokens=*" %%a in ('adb version 2^>^&1') do (
+        echo [OK] Detected %%a
+        goto adb_done
+    )
+)
+:adb_done
 
 :: 2. Check if required AI, Vision, and Dashboard libraries are installed
 echo [*] Checking required dependencies...

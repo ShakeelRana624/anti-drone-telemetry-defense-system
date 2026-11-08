@@ -139,6 +139,10 @@ class IPCameraStream:
             return ""
 
         port = cfg.get("port", 554)
+        # Safeguard: For RTSP streams, if port was inadvertently set to 80 (standard HTTP/ONVIF port),
+        # force RTSP port to 554 (or configured rtsp_port) so video streaming does not fail
+        if mode in ("ptz_onvif", "ip_rtsp") and port == 80:
+            port = cfg.get("rtsp_port", 554)
         user = (cfg.get("username") or "").strip()
         pwd = (cfg.get("password") or "").strip()
         path = (cfg.get("rtsp_path") or "").strip()
@@ -210,6 +214,8 @@ class IPCameraStream:
                     pass
                 self._cap = None
             self.healthy = False
+        if not self._running:
+            self.start()
 
     def read(self) -> np.ndarray:
         """
@@ -253,7 +259,10 @@ class IPCameraStream:
                     try:
                         cam_ip = self.config.get("ip", "").strip()
                         cam_port = int(self.config.get("port", 554))
-                        is_usb = self.config.get("connection_mode") in ("usb", "webcam") or isinstance(self.source, int)
+                        conn_mode = self.config.get("connection_mode", "ip_rtsp")
+                        if conn_mode in ("ptz_onvif", "ip_rtsp") and cam_port == 80:
+                            cam_port = int(self.config.get("rtsp_port", 554))
+                        is_usb = conn_mode in ("usb", "webcam") or isinstance(self.source, int)
                         is_file = isinstance(self.source, str) and any(str(self.source).lower().endswith(ext) for ext in [".mp4", ".avi", ".mov", ".mkv"])
                         is_reachable = True
 
@@ -349,27 +358,34 @@ class IPCameraStream:
         for y in range(30, h, 60):
             cv2.line(img, (0, y), (w, y), grid_color, 1)
 
-        # Crosshair & reticle
+        # Clean center tactical viewport frame (zero circular crosshairs to prevent AI false positives)
         cx, cy = w // 2, h // 2
         accent_bgr = (173, 165, 243)
         crimson_bgr = (35, 30, 154)
 
-        cv2.circle(img, (cx, cy), 45, grid_color, 1)
-        cv2.circle(img, (cx, cy), 4, accent_bgr, -1)
-        cv2.line(img, (cx - 20, cy), (cx - 8, cy), accent_bgr, 1)
-        cv2.line(img, (cx + 8, cy), (cx + 20, cy), accent_bgr, 1)
-        cv2.line(img, (cx, cy - 20), (cx, cy - 8), accent_bgr, 1)
-        cv2.line(img, (cx, cy + 8), (cx, cy + 20), accent_bgr, 1)
+        # Subtle corner brackets around central sector
+        bw, bh = 120, 70
+        x1, y1 = cx - bw, cy - bh
+        x2, y2 = cx + bw, cy + bh
+        k = 15
+        cv2.line(img, (x1, y1), (x1 + k, y1), grid_color, 1)
+        cv2.line(img, (x1, y1), (x1, y1 + k), grid_color, 1)
+        cv2.line(img, (x2, y1), (x2 - k, y1), grid_color, 1)
+        cv2.line(img, (x2, y1), (x2, y1 + k), grid_color, 1)
+        cv2.line(img, (x1, y2), (x1 + k, y2), grid_color, 1)
+        cv2.line(img, (x1, y2), (x1, y2 - k), grid_color, 1)
+        cv2.line(img, (x2, y2), (x2 - k, y2), grid_color, 1)
+        cv2.line(img, (x2, y2), (x2, y2 - k), grid_color, 1)
 
         # Clean tactical surveillance standby status
         if not self.config.get("configured", False):
-            cv2.putText(img, "SENSOR UNCONFIGURED // HARDWARE OFFLINE", (cx - 180, cy + 70), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (180, 180, 210), 1, cv2.LINE_AA)
-            cv2.putText(img, "OPEN CAMERA SETUP TAB TO CONFIGURE SENSOR", (cx - 190, cy + 95), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (120, 120, 150), 1, cv2.LINE_AA)
+            cv2.putText(img, "SENSOR UNCONFIGURED // HARDWARE OFFLINE", (cx - 170, cy - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (180, 180, 210), 1, cv2.LINE_AA)
+            cv2.putText(img, "OPEN CAMERA SETUP TAB TO CONFIGURE SENSOR", (cx - 180, cy + 18), cv2.FONT_HERSHEY_SIMPLEX, 0.38, (120, 120, 150), 1, cv2.LINE_AA)
             status_text = "STANDBY [CAMERA UNCONFIGURED]"
         else:
-            cv2.putText(img, "AIRSPACE SECURE - OPTICAL SURVEILLANCE ACTIVE", (cx - 190, cy + 70), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (180, 180, 210), 1, cv2.LINE_AA)
-            cv2.putText(img, "AWAITING AERIAL TARGET DETECTION", (cx - 130, cy + 95), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (120, 120, 150), 1, cv2.LINE_AA)
-            status_text = "LIVE [IP CONNECTED]" if self.healthy else "STANDBY [SIMULATOR MODE]"
+            cv2.putText(img, "AIRSPACE SECURE - OPTICAL SURVEILLANCE ACTIVE", (cx - 180, cy - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (180, 180, 210), 1, cv2.LINE_AA)
+            cv2.putText(img, "AWAITING AERIAL TARGET DETECTION", (cx - 130, cy + 18), cv2.FONT_HERSHEY_SIMPLEX, 0.38, (120, 120, 150), 1, cv2.LINE_AA)
+            status_text = "LIVE [IP CONNECTED]" if self.healthy else "STANDBY [SEARCHING SENSOR]"
 
         # Top Bar: Camera Label & Status
         cam_label = self.config.get("name", self.camera_id).replace("—", "-").replace("–", "-").upper()

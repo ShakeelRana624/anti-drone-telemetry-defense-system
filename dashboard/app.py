@@ -19,6 +19,7 @@ import logging
 import math
 import queue
 import threading
+import time
 from collections import deque
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -45,6 +46,20 @@ _event_buffer: Deque[Dict[str, Any]] = deque(maxlen=200)
 # Active aerial targets tracked in real time for Table & Radar
 _active_targets: Dict[str, Dict[str, Any]] = {}
 _targets_lock = threading.Lock()
+
+# Global Mobile Alert state for real-time acoustic/visual alarm broadcast
+_mobile_alert_state: Dict[str, Any] = {
+    "active": False,
+    "timestamp": "",
+    "camera_id": "Primary Optical HD",
+    "bearing": 180.0,
+    "count": 1,
+    "threat_level": "CRITICAL",
+    "drone_type": "DRONE IED DETECTED",
+    "message": "خبردار! ڈرون آئی ای ڈی ڈیٹیکٹ ہو گئی ہے! تمام لوگ اوور ہیڈ پروٹیکشن لیں۔",
+    "updated_at": 0.0,
+}
+_alert_state_lock = threading.Lock()
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -145,6 +160,32 @@ def push_sse_event(data: dict) -> None:
     ev = data.get("event")
     if ev == "detection" or data.get("trigger_alert"):
         _session_analytics.record_detection(data)
+
+    # Any drone detection (live optical feed, thermal feed, or simulation) triggers mobile emergency alert
+    is_drone_incursion = (ev in ("alert", "detection") and (data.get("drone_type") or data.get("count", 0) > 0 or data.get("trigger_alert")))
+
+    if is_drone_incursion:
+        with _alert_state_lock:
+            already_active = bool(_mobile_alert_state.get("active", False))
+            _mobile_alert_state["active"] = True
+            _mobile_alert_state["timestamp"] = data.get("timestamp", datetime.now().strftime("%H:%M:%S"))
+            _mobile_alert_state["camera_id"] = data.get("camera_id", "Primary Optical HD")
+            _mobile_alert_state["bearing"] = float(data.get("bearing_deg", data.get("bearing", 180.0)))
+            _mobile_alert_state["count"] = int(data.get("count", 1))
+            _mobile_alert_state["threat_level"] = data.get("threat_level", "CRITICAL")
+            _mobile_alert_state["drone_type"] = data.get("drone_type", "DRONE IED DETECTED")
+            _mobile_alert_state["updated_at"] = time.time()
+
+        # Mark trigger_alert in the event payload so frontend clients know this is an active alert
+        data["trigger_alert"] = True
+
+        # Only wake up and launch Chrome ONCE per incursion (NOT on every 30fps video frame!)
+        if not already_active:
+            try:
+                from alerting.mobile_comset import MobileComset
+                MobileComset.get_instance().on_drone_detected(data)
+            except Exception:
+                pass
 
     data["total_detections"] = _session_analytics.total_detections
     data["today_detections"] = _session_analytics.today_detections
@@ -285,6 +326,115 @@ class DashboardApp:
             """
             return render_template("index.html")
 
+        # ── Mobile Tactical Alert Screen ──────────────────────────
+        @app.route("/alert")
+        def mobile_alert():
+            """
+            Render the dedicated mobile full-screen audio & visual alert interface.
+
+            Returns:
+                str: Rendered HTML template for mobile.
+            """
+            return render_template("mobile_alert.html")
+
+        @app.route("/api/alert/status", methods=["GET"])
+        def alert_status():
+            """Return current real-time mobile alert status."""
+            with _alert_state_lock:
+                return jsonify(dict(_mobile_alert_state))
+
+        @app.route("/api/alert/trigger", methods=["POST"])
+        def alert_trigger():
+            """Manually trigger emergency alert broadcast across all mobile screens."""
+            req = request.get_json(silent=True) or {}
+            with _alert_state_lock:
+                _mobile_alert_state["active"] = True
+                _mobile_alert_state["timestamp"] = datetime.now().strftime("%H:%M:%S")
+                _mobile_alert_state["camera_id"] = req.get("camera_id", "Primary Optical HD")
+                _mobile_alert_state["bearing"] = float(req.get("bearing", 180.0))
+                _mobile_alert_state["count"] = int(req.get("count", 1))
+                _mobile_alert_state["threat_level"] = req.get("threat_level", "CRITICAL")
+                _mobile_alert_state["drone_type"] = req.get("drone_type", "DRONE IED DETECTED")
+                _mobile_alert_state["message"] = "خبردار! ڈرون آئی ای ڈی ڈیٹیکٹ ہو گئی ہے! تمام لوگ اوور ہیڈ پروٹیکشن لیں۔"
+                _mobile_alert_state["updated_at"] = time.time()
+
+            push_sse_event({
+                "event": "alert",
+                "trigger_alert": True,
+                "timestamp": _mobile_alert_state["timestamp"],
+                "camera_id": _mobile_alert_state["camera_id"],
+                "bearing": _mobile_alert_state["bearing"],
+                "count": _mobile_alert_state["count"],
+                "threat_level": _mobile_alert_state["threat_level"],
+                "drone_type": _mobile_alert_state["drone_type"],
+            })
+
+            try:
+                from alerting.mobile_comset import MobileComset
+                MobileComset.get_instance().on_drone_detected()
+            except Exception:
+                pass
+
+            return jsonify({"status": "ok", "active": True})
+
+        @app.route("/api/alert/dismiss", methods=["POST"])
+        def alert_dismiss():
+            """Silence and dismiss active mobile alert state."""
+            with _alert_state_lock:
+                _mobile_alert_state["active"] = False
+                _mobile_alert_state["updated_at"] = time.time()
+            try:
+                from alerting.mobile_comset import MobileComset
+                MobileComset.get_instance().reset_cooldown()
+            except Exception:
+                pass
+            push_sse_event({"event": "alert_dismissed"})
+            return jsonify({"status": "ok", "active": False})
+
+        # ── Mobile Android ADB & Alert Endpoints ──────────────────
+        @app.route("/api/mobile/status", methods=["GET"])
+        def mobile_status():
+            """Return current wireless mobile pairing and connection status."""
+            from alerting.mobile_comset import MobileComset
+            return jsonify(MobileComset.get_instance().get_status())
+
+        @app.route("/api/mobile/pair", methods=["POST"])
+        def mobile_pair():
+            """Pair wireless Android device via pairing code."""
+            from alerting.mobile_comset import MobileComset
+            req = request.get_json(silent=True) or {}
+            pair_addr = req.get("pair_addr", "")
+            pair_code = req.get("pair_code", "")
+            conn_port = req.get("conn_port", "")
+
+            if not pair_addr or not pair_code:
+                return jsonify({"success": False, "message": "IP:Port and Pairing Code are required."}), 400
+
+            success, msg = MobileComset.get_instance().pair(pair_addr, pair_code, conn_port)
+            status = MobileComset.get_instance().get_status()
+            return jsonify({
+                "success": success,
+                "message": msg,
+                "status": status,
+            })
+
+        @app.route("/api/mobile/launch", methods=["POST"])
+        def mobile_launch():
+            """Wake up phone and open Chrome with the alert screen."""
+            from alerting.mobile_comset import MobileComset
+            success, msg = MobileComset.get_instance().launch_alert_screen()
+            return jsonify({"success": success, "message": msg})
+
+        @app.route("/api/mobile/disconnect", methods=["POST"])
+        def mobile_disconnect():
+            """Disconnect wireless ADB connection."""
+            from alerting.mobile_comset import MobileComset
+            m = MobileComset.get_instance()
+            target = m.get_status().get("target")
+            if target:
+                m._run_adb(["disconnect", target])
+            return jsonify({"success": True, "message": "Device disconnected."})
+
         # ── SSE stream ────────────────────────────────────────────
         @app.route("/api/events")
         def sse():
@@ -368,6 +518,7 @@ class DashboardApp:
             try:
                 p = Path(path_str).resolve()
                 allowed_roots = [
+                    Path("evidence").resolve(),
                     Path("logs/snapshots").resolve(),
                     Path("logs/evidence_videos").resolve(),
                     Path("dashboard/static").resolve(),
@@ -608,8 +759,8 @@ class DashboardApp:
                 engine.set_telemetry_callback(push_sse_event)
 
                 while True:
-                    frame = cam_mgr.get_frame(camera_id)
-                    if frame is not None:
+                    frame, is_real = cam_mgr.get_frame_with_status(camera_id)
+                    if frame is not None and is_real:
                         processed_frame = engine.process_frame(frame, camera_id=camera_id)
                     else:
                         processed_frame = frame
@@ -639,8 +790,8 @@ class DashboardApp:
             Returns:
                 Response: JSON list of catalog entries with case IDs, video durations, and file paths.
             """
-            from logging_system.evidence_recorder import EvidenceRecorder
-            recorder = EvidenceRecorder()
+            from logging_system.evidence_recorder import get_evidence_recorder
+            recorder = get_evidence_recorder()
             items = recorder.list_evidence()
             return jsonify({"success": True, "evidence": items, "count": len(items)})
 
@@ -656,12 +807,12 @@ class DashboardApp:
             filename = request.args.get("filename") or request.args.get("path", "")
             if not filename:
                 return jsonify({"error": "Missing filename"}), 400
-            from logging_system.evidence_recorder import EvidenceRecorder
-            recorder = EvidenceRecorder()
+            from logging_system.evidence_recorder import get_evidence_recorder
+            recorder = get_evidence_recorder()
             p = recorder.get_video_path(filename)
             if not p or not p.exists():
                 return jsonify({"error": "Video file not found"}), 404
-            return send_file(str(p), mimetype="video/mp4", as_attachment=False)
+            return send_file(str(p.resolve()), mimetype="video/mp4", as_attachment=False)
 
         @app.route("/api/evidence/download")
         def evidence_download():
@@ -675,12 +826,12 @@ class DashboardApp:
             filename = request.args.get("filename") or request.args.get("path", "")
             if not filename:
                 return jsonify({"error": "Missing filename"}), 400
-            from logging_system.evidence_recorder import EvidenceRecorder
-            recorder = EvidenceRecorder()
+            from logging_system.evidence_recorder import get_evidence_recorder
+            recorder = get_evidence_recorder()
             p = recorder.get_video_path(filename)
             if not p or not p.exists():
                 return jsonify({"error": "Video file not found"}), 404
-            return send_file(str(p), as_attachment=True, download_name=p.name)
+            return send_file(str(p.resolve()), as_attachment=True, download_name=p.name)
 
         # ── Tactical RF Comset API ───────────────────────────────
         @app.route("/api/rf/status", methods=["GET"])
@@ -1010,24 +1161,31 @@ def _generate_tactical_frame(camera_id: str, frame_idx: int) -> Any:
     for y in range(30, height, 60):
         cv2.line(img, (0, y), (width, y), grid_color, 1)
 
-    # Center tactical crosshair
+    # Center tactical viewport frame (zero circular crosshairs to prevent AI false positives)
     cx, cy = width // 2, height // 2
     accent_bgr = (173, 165, 243)  # #F3A5AD in BGR
     wine_bgr = (2, 2, 104)        # #680202 in BGR
     crimson_bgr = (35, 30, 154)   # #9A1E23 in BGR
 
-    cv2.circle(img, (cx, cy), 45, grid_color, 1)
-    cv2.circle(img, (cx, cy), 4, accent_bgr, -1)
-    cv2.line(img, (cx - 20, cy), (cx - 8, cy), accent_bgr, 1)
-    cv2.line(img, (cx + 8, cy), (cx + 20, cy), accent_bgr, 1)
-    cv2.line(img, (cx, cy - 20), (cx, cy - 8), accent_bgr, 1)
-    cv2.line(img, (cx, cy + 8), (cx, cy + 20), accent_bgr, 1)
+    # Corner brackets around central sector
+    bw, bh = 120, 70
+    x1, y1 = cx - bw, cy - bh
+    x2, y2 = cx + bw, cy + bh
+    k = 15
+    cv2.line(img, (x1, y1), (x1 + k, y1), grid_color, 1)
+    cv2.line(img, (x1, y1), (x1, y1 + k), grid_color, 1)
+    cv2.line(img, (x2, y1), (x2 - k, y1), grid_color, 1)
+    cv2.line(img, (x2, y1), (x2, y1 + k), grid_color, 1)
+    cv2.line(img, (x1, y2), (x1 + k, y2), grid_color, 1)
+    cv2.line(img, (x1, y2), (x1, y2 - k), grid_color, 1)
+    cv2.line(img, (x2, y2), (x2 - k, y2), grid_color, 1)
+    cv2.line(img, (x2, y2), (x2, y2 - k), grid_color, 1)
 
     # Clean boresight status indicator (NO FAKE TARGETS)
-    cv2.putText(img, "AIRSPACE SECURE - OPTICAL SURVEILLANCE ACTIVE", (cx - 190, cy + 70),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.40, (180, 180, 210), 1, cv2.LINE_AA)
-    cv2.putText(img, "AWAITING AERIAL TARGET DETECTION", (cx - 130, cy + 95),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.35, (120, 120, 150), 1, cv2.LINE_AA)
+    cv2.putText(img, "AIRSPACE SECURE - OPTICAL SURVEILLANCE ACTIVE", (cx - 180, cy - 8),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.42, (180, 180, 210), 1, cv2.LINE_AA)
+    cv2.putText(img, "AWAITING AERIAL TARGET DETECTION", (cx - 130, cy + 18),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.38, (120, 120, 150), 1, cv2.LINE_AA)
 
     # Top overlay header
     cam_name = "CAM-01 [NORTH PERIMETER - OPTICAL]" if not is_cam2 else "CAM-02 [EAST SECTOR - FLIR THERMAL]"
